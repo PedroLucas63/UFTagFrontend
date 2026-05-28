@@ -1,0 +1,28 @@
+{
+   "name": "react-native-cli-android",
+   "build": {
+      "dockerfile": "Dockerfile",
+      "args": {
+         "NODE_VERSION": "22"
+      }
+   },
+   "remoteUser": "vscode",
+   "customizations": {
+      "vscode": {
+         "settings": {
+            "terminal.integrated.defaultProfile.linux": "bash"
+         }
+      }
+   },
+   "runArgs": [
+      "--privileged",
+      "--network=host",
+      "--device=/dev/kvm",
+      "--device=/dev/bus/usb"
+   ],
+   "postCreateCommand": "npm config set fund false && npm config set update-notifier false",
+   "mounts": [
+      "source=${localWorkspaceFolder},target=/workspace,type=bind"
+   ],
+   "workspaceFolder": "/workspace"
+}
