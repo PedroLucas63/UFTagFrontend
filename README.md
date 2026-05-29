@@ -84,6 +84,24 @@ You've successfully run and modified your React Native App. :partying_face:
 
 # Troubleshooting
 
+## Android (ADB)
+
+Se o `adb devices` nao exibe o smartphone, use:
+
+```sh
+adb kill-server
+adb start-server
+adb devices
+```
+
+Execute esses comandos no host e no container.
+
+Para conectar com a API, use o reverse em ambos:
+
+```sh
+adb reverse tcp:5156 tcp:5156
+```
+
 If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
 # Learn More
