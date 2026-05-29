@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
    View,
@@ -14,22 +14,73 @@ import {
 } from "lucide-react-native";
 
 import { useNavigation } from "@react-navigation/native";
+import { AlertModal } from "../components/AlertModal";
+import { forgotPassword } from "../api/auth";
 
 export function ForgotPasswordScreen() {
    const navigation = useNavigation();
 
    const [email, setEmail] = useState("");
 
-   function handleSubmit() {
-      // TODO: Aqui você pode adicionar a lógica para solicitar a recuperação de senha, como chamadas à API
-      Alert.alert(
-         "Sucesso",
-         "Email de recuperação enviado"
-      );
+   const [loading, setLoading] =
+      useState(false);
 
-      setTimeout(() => {
-         navigation.goBack();
-      }, 1500);
+   const [alertState, setAlertState] =
+      useState({
+         visible: false,
+         title: "",
+         message: "",
+      });
+
+   const emailIsValid = useMemo(() => {
+      return /\S+@\S+\.\S+/.test(email);
+   }, [email]);
+
+   async function handleSubmit() {
+      if (
+         !emailIsValid ||
+         loading
+      ) {
+         return;
+      }
+
+      try {
+         setLoading(true);
+
+         const result = await forgotPassword(email);
+
+         if (!result.ok) {
+            setAlertState({
+               visible: true,
+               title: "Erro",
+               message: result.error,
+            });
+            return;
+         }
+
+         setAlertState({
+            visible: true,
+            title: "Sucesso",
+            message: "Instruções para recuperar sua senha enviadas, cheque o seu e-mail!",
+         });
+
+         await new Promise(() =>
+            setTimeout(() => {
+               navigation.goBack();
+            }, 3000)
+         );
+      } catch (error) {
+         setAlertState({
+            visible: true,
+            title: "Erro",
+            message:
+               error instanceof Error
+                  ? error.message
+                  : "Falha ao solicitar recuperação de senha",
+         });
+      } finally {
+         setLoading(false);
+      }
    }
 
    return (
@@ -68,34 +119,55 @@ export function ForgotPasswordScreen() {
             </View>
 
             <View className="bg-white rounded-3xl p-8 shadow">
-
                <View>
+                  <View>
+                     <View
+                        className={`flex-row items-center border rounded-2xl px-4 py-3 ${email.length > 0
+                           ? emailIsValid
+                              ? "border-green-500"
+                              : "border-red-500"
+                           : "border-gray-300"
+                           }`}
+                     >
+                        <Mail
+                           size={20}
+                           color="#6B7280"
+                        />
 
-                  <View className="flex-row items-center border border-gray-300 rounded-2xl px-4 py-3 mb-4">
+                        <TextInput
+                           placeholder="Email"
+                           value={email}
+                           onChangeText={
+                              setEmail
+                           }
+                           keyboardType="email-address"
+                           autoCapitalize="none"
+                           placeholderTextColor="#6B7280"
+                           className="flex-1 ml-3"
+                        />
+                     </View>
 
-                     <Mail
-                        size={20}
-                        color="#6B7280"
-                     />
-
-                     <TextInput
-                        placeholder="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        placeholderTextColor="#6B7280"
-                        className="flex-1 ml-3"
-                     />
-
+                     {email.length > 0 &&
+                        !emailIsValid && (
+                           <Text className="text-red-500 text-xs mt-1 ml-1">
+                              Email inválido
+                           </Text>
+                        )}
                   </View>
 
                   <TouchableOpacity
                      onPress={handleSubmit}
-                     className="bg-blue-600 rounded-2xl py-4 items-center"
+                     disabled={!emailIsValid || loading}
+                     className={`rounded-2xl py-4 items-center mt-2 ${emailIsValid &&
+                        !loading
+                        ? "bg-blue-600"
+                        : "bg-gray-400"
+                        }`}
                   >
                      <Text className="text-white font-semibold text-base">
-                        Solicitar Alteração
+                        {loading
+                           ? "Solicitando alteração..."
+                           : "Solicitar Alteração"}
                      </Text>
                   </TouchableOpacity>
 
@@ -103,6 +175,17 @@ export function ForgotPasswordScreen() {
 
             </View>
          </View>
+         <AlertModal
+            visible={alertState.visible}
+            title={alertState.title}
+            message={alertState.message}
+            onClose={() =>
+               setAlertState((prev) => ({
+                  ...prev,
+                  visible: false,
+               }))
+            }
+         />
       </View>
    );
 }
