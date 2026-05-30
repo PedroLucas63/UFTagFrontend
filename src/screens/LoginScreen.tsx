@@ -10,6 +10,8 @@ import {
 import {
    Mail,
    Lock,
+   Eye,
+   EyeOff,
 } from "lucide-react-native";
 
 import { login, logout } from "../api/auth";
@@ -25,6 +27,9 @@ export function LoginScreen() {
 
    const [password, setPassword] =
       useState("");
+
+   const [showPassword, setShowPassword] =
+      useState(false);
 
    const [loading, setLoading] =
       useState(false);
@@ -159,10 +164,18 @@ export function LoginScreen() {
                            onChangeText={
                               setPassword
                            }
-                           secureTextEntry
+                           secureTextEntry={!showPassword}
                            placeholderTextColor="#6B7280"
                            className="flex-1 ml-3 text-gray-900"
                         />
+
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                           {showPassword ? (
+                              <EyeOff size={20} color="#6B7280" />
+                           ) : (
+                              <Eye size={20} color="#6B7280" />
+                           )}
+                        </TouchableOpacity>
                      </View>
 
                      {password.length ===

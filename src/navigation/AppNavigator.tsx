@@ -10,6 +10,7 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { ForgotPasswordScreen } from "../screens/ForgotPasswordScreen";
 import { SignupScreen } from "../screens/SignupScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
 import { getAccessToken, getRefreshToken } from "../storage/tokenStorage";
 import { setAuthState, subscribeAuthState } from "../auth/authState";
 import { RootStackParamList } from "./types";
@@ -68,10 +69,18 @@ export function AppNavigator() {
             }}
          >
             {isAuthenticated ? (
-               <Stack.Screen
-                  name="Home"
-                  component={HomeScreen}
-               />
+               <>
+                  <Stack.Screen
+                     name="Home"
+                     component={HomeScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="Settings"
+                     component={SettingsScreen}
+                     options={{ animation: "none" }}
+                  />
+               </>
             ) : (
                <>
                   <Stack.Screen

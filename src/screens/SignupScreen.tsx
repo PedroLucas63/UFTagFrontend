@@ -13,9 +13,13 @@ import {
    Mail,
    Lock,
    ArrowLeft,
+   Eye,
+   EyeOff,
 } from "lucide-react-native";
 
-import { register } from "../api/auth";
+import { login, register } from "../api/auth";
+import { apiClient } from "../api/client";
+import { getMe, updateName } from "../api/users";
 import { AlertModal } from "../components/AlertModal";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
@@ -28,10 +32,18 @@ export function SignupScreen() {
    const [password, setPassword] =
       useState("");
 
+   const [showPassword, setShowPassword] =
+      useState(false);
+
    const [
       confirmPassword,
       setConfirmPassword,
    ] = useState("");
+
+   const [
+      showConfirmPassword,
+      setShowConfirmPassword,
+   ] = useState(false);
 
    const [loading, setLoading] =
       useState(false);
@@ -102,6 +114,29 @@ export function SignupScreen() {
             return;
          }
 
+         if (name.trim()) {
+            try {
+               const loginRes = await apiClient.post("/login", { email, password });
+               const { accessToken } = loginRes.data;
+               
+               if (accessToken) {
+                  apiClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+                  
+                  const meResult = await getMe();
+                  if (meResult.ok && meResult.data) {
+                     const userId = meResult.data.Id ?? meResult.data.Id;
+                     if (userId) {
+                        await updateName(userId, name);
+                     }
+                  }
+               }
+            } catch (err) {
+               console.log("Erro ao salvar o nome em background:", err);
+            } finally {
+               delete apiClient.defaults.headers.common["Authorization"];
+            }
+         }
+
          setAlertState({
             visible: true,
             title: "Sucesso",
@@ -109,8 +144,8 @@ export function SignupScreen() {
          });
 
          await new Promise(() =>
-            setTimeout(() => {
-               navigation.goBack();
+         setTimeout(() => {
+            navigation.goBack();
             }, 3000)
          );
       } catch (error) {
@@ -235,10 +270,18 @@ export function SignupScreen() {
                            onChangeText={
                               setPassword
                            }
-                           secureTextEntry
+                           secureTextEntry={!showPassword}
                            placeholderTextColor="#6B7280"
                            className="flex-1 ml-3 text-gray-900"
                         />
+
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                           {showPassword ? (
+                              <EyeOff size={20} color="#6B7280" />
+                           ) : (
+                              <Eye size={20} color="#6B7280" />
+                           )}
+                        </TouchableOpacity>
                      </View>
 
                      {password.length > 0 && (
@@ -302,10 +345,18 @@ export function SignupScreen() {
                            onChangeText={
                               setConfirmPassword
                            }
-                           secureTextEntry
+                           secureTextEntry={!showConfirmPassword}
                            placeholderTextColor="#6B7280"
                            className="flex-1 ml-3 text-gray-900"
                         />
+
+                        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                           {showConfirmPassword ? (
+                              <EyeOff size={20} color="#6B7280" />
+                           ) : (
+                              <Eye size={20} color="#6B7280" />
+                           )}
+                        </TouchableOpacity>
                      </View>
 
                      {confirmPassword.length >
