@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import { request } from "./request";
+import { ApiResult, request } from "./request";
 
 export type DeviceResponse = {
    Id: string;
@@ -9,17 +9,11 @@ export type DeviceResponse = {
    CreatedAt: string;
 };
 
-export async function getDevices(): Promise<DeviceResponse[]> {
-   const response = await request<DeviceResponse[]>(
+export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {
+   return await request<DeviceResponse[]>(
       apiClient.get("/devices"),
       {
          fallbackError: "Falha ao carregar dispositivos",
       }
    );
-
-   if (response.ok) {
-      return response.data;
-   }
-
-   return [];
 }
