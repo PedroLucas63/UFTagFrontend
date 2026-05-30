@@ -124,7 +124,7 @@ export function SignupScreen() {
                   
                   const meResult = await getMe();
                   if (meResult.ok && meResult.data) {
-                     const userId = meResult.data.Id ?? meResult.data.Id;
+                     const userId = meResult.data.id;
                      if (userId) {
                         await updateName(userId, name);
                      }

@@ -2,12 +2,12 @@ import { apiClient } from "./client";
 import { ApiResult, request } from "./request";
 
 export type UserResponse = {
-   Id?: string;
-   Name?: string;
-   Email?: string;
-   PhoneNumber?: string;
-   IsEmailConfirmed?: boolean;
-   IsPhoneNumberConfirmed?: boolean;
+   id?: string;
+   name?: string;
+   email?: string;
+   phoneNumber?: string;
+   isEmailConfirmed?: boolean;
+   isPhoneNumberConfirmed?: boolean;
 };
 
 export async function getMe(): Promise<ApiResult<UserResponse>> {

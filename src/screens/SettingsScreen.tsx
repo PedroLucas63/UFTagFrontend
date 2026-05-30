@@ -45,8 +45,8 @@ export function SettingsScreen() {
 
             if (result.ok) {
                setUser(result.data);
-               setName(result.data.Name ?? result.data.Name ?? "");
-               setPhone(result.data.PhoneNumber ?? result.data.PhoneNumber ?? "");
+               setName(result.data.name ?? "");
+               setPhone(result.data.phoneNumber ?? "");
             } else {
                setAlertState({
                   visible: true,
@@ -77,14 +77,14 @@ export function SettingsScreen() {
 
    async function handleSaveChanges() {
       if (!user) return;
-      const userId = user.Id ?? user.Id;
+      const userId = user.id;
       if (!userId) return;
 
       try {
          setSaving(true);
 
          // 1. Update Name if changed
-         const originalName = user.Name ?? user.Name ?? "";
+         const originalName = user.name ?? "";
          if (name.trim() !== originalName.trim()) {
             const nameResult = await updateName(userId, name);
             if (!nameResult.ok) {
@@ -97,8 +97,10 @@ export function SettingsScreen() {
             }
          }
 
+
+
          // 2. Update Phone if changed
-         const originalPhone = user.PhoneNumber ?? user.PhoneNumber ?? "";
+         const originalPhone = user.phoneNumber ?? "";
          if (phone.trim() !== originalPhone.trim()) {
             const phoneResult = await updatePhoneNumber(userId, phone);
             if (!phoneResult.ok) {
@@ -121,8 +123,8 @@ export function SettingsScreen() {
             prev
                ? {
                     ...prev,
-                    Name: name,
-                    PhoneNumber: phone,
+                    name: name,
+                    phoneNumber: phone,
                  }
                : null
          );
