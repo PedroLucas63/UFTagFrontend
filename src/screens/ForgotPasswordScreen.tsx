@@ -5,7 +5,6 @@ import {
    Text,
    TextInput,
    TouchableOpacity,
-   Alert,
 } from "react-native";
 
 import {
@@ -13,12 +12,13 @@ import {
    ArrowLeft,
 } from "lucide-react-native";
 
-import { useNavigation } from "@react-navigation/native";
 import { AlertModal } from "../components/AlertModal";
 import { forgotPassword } from "../api/auth";
+import { Loading } from "../components/Loading";
+import { useAppNavigation } from "../navigation/types";
 
 export function ForgotPasswordScreen() {
-   const navigation = useNavigation();
+   const navigation = useAppNavigation();
 
    const [email, setEmail] = useState("");
 
@@ -164,11 +164,19 @@ export function ForgotPasswordScreen() {
                         : "bg-gray-400"
                         }`}
                   >
-                     <Text className="text-white font-semibold text-base">
-                        {loading
-                           ? "Solicitando alteração..."
-                           : "Solicitar Alteração"}
-                     </Text>
+                     {loading ? (
+                        <Loading
+                           variant="inline"
+                           size="sm"
+                           color="#FFFFFF"
+                           message="Solicitando alteração..."
+                           textClassName="text-white font-semibold text-base"
+                        />
+                     ) : (
+                        <Text className="text-white font-semibold text-base">
+                           Solicitar Alteração
+                        </Text>
+                     )}
                   </TouchableOpacity>
 
                </View>

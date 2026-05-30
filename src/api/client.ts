@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { setAuthState } from '../auth/authState';
 import { getAccessToken, getRefreshToken, removeAccessToken, removeRefreshToken, saveAccessToken, saveRefreshToken } from '../storage/tokenStorage';
 
 export const apiClient = axios.create({
@@ -87,6 +88,7 @@ apiClient.interceptors.response.use(
          if (!refreshToken) {
             await removeAccessToken();
             await removeRefreshToken();
+            setAuthState(false);
             processQueue(error);
             return Promise.reject(error);
          }
@@ -122,6 +124,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
          await removeAccessToken();
          await removeRefreshToken();
+         setAuthState(false);
 
          processQueue(refreshError);
 

@@ -1,4 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 
 import {
    createNativeStackNavigator,
@@ -7,10 +9,57 @@ import {
 import { LoginScreen } from "../screens/LoginScreen";
 import { ForgotPasswordScreen } from "../screens/ForgotPasswordScreen";
 import { SignupScreen } from "../screens/SignupScreen";
+import { HomeScreen } from "../screens/HomeScreen";
+import { getAccessToken, getRefreshToken } from "../storage/tokenStorage";
+import { setAuthState, subscribeAuthState } from "../auth/authState";
+import { RootStackParamList } from "./types";
+import { Loading } from "../components/Loading";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
+   const [isAuthenticated, setIsAuthenticated] =
+      useState<boolean | null>(null);
+
+   useEffect(() => {
+      let isMounted = true;
+
+      const unsubscribe = subscribeAuthState(
+         (nextState) => {
+            if (isMounted) {
+               setIsAuthenticated(nextState);
+            }
+         }
+      );
+
+      async function bootstrapAuth() {
+         const accessToken = await getAccessToken();
+         const refreshToken = await getRefreshToken();
+         const hasTokens = Boolean(
+            accessToken && refreshToken
+         );
+         setAuthState(hasTokens);
+      }
+
+      bootstrapAuth();
+
+      return () => {
+         isMounted = false;
+         unsubscribe();
+      };
+   }, []);
+
+   if (isAuthenticated === null) {
+      return (
+         <View className="flex-1">
+            <Loading
+               message="Preparando sua sessao..."
+               containerClassName="flex-1"
+            />
+         </View>
+      );
+   }
+
    return (
       <NavigationContainer>
          <Stack.Navigator
@@ -18,18 +67,27 @@ export function AppNavigator() {
                headerShown: false,
             }}
          >
-            <Stack.Screen
-               name="Login"
-               component={LoginScreen}
-            />
-            <Stack.Screen
-               name="ForgotPassword"
-               component={ForgotPasswordScreen}
-            />
-            <Stack.Screen
-               name="Signup"
-               component={SignupScreen}
-            />
+            {isAuthenticated ? (
+               <Stack.Screen
+                  name="Home"
+                  component={HomeScreen}
+               />
+            ) : (
+               <>
+                  <Stack.Screen
+                     name="Login"
+                     component={LoginScreen}
+                  />
+                  <Stack.Screen
+                     name="ForgotPassword"
+                     component={ForgotPasswordScreen}
+                  />
+                  <Stack.Screen
+                     name="Signup"
+                     component={SignupScreen}
+                  />
+               </>
+            )}
          </Stack.Navigator>
       </NavigationContainer>
    );

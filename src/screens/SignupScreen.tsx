@@ -15,13 +15,13 @@ import {
    ArrowLeft,
 } from "lucide-react-native";
 
-import { useNavigation } from "@react-navigation/native";
-
 import { register } from "../api/auth";
 import { AlertModal } from "../components/AlertModal";
+import { Loading } from "../components/Loading";
+import { useAppNavigation } from "../navigation/types";
 
 export function SignupScreen() {
-   const navigation = useNavigation();
+   const navigation = useAppNavigation();
 
    const [name, setName] = useState("");
    const [email, setEmail] = useState("");
@@ -331,11 +331,19 @@ export function SignupScreen() {
                         : "bg-gray-400"
                         }`}
                   >
-                     <Text className="text-white font-semibold text-base">
-                        {loading
-                           ? "Cadastrando..."
-                           : "Cadastrar"}
-                     </Text>
+                     {loading ? (
+                        <Loading
+                           variant="inline"
+                           size="sm"
+                           color="#FFFFFF"
+                           message="Cadastrando..."
+                           textClassName="text-white font-semibold text-base"
+                        />
+                     ) : (
+                        <Text className="text-white font-semibold text-base">
+                           Cadastrar
+                        </Text>
+                     )}
                   </TouchableOpacity>
                </View>
 

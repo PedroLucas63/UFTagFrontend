@@ -4,6 +4,7 @@ import {
    saveAccessToken,
    saveRefreshToken,
 } from "../storage/tokenStorage";
+import { setAuthState } from "../auth/authState";
 import { apiClient } from "./client";
 import {
    ApiResult,
@@ -50,6 +51,7 @@ export async function login(
 
    await saveAccessToken(accessToken);
    await saveRefreshToken(refreshToken);
+   setAuthState(true);
 
    return result;
 }
@@ -88,4 +90,5 @@ export async function forgotPassword(
 export async function logout(): Promise<void> {
    await removeAccessToken();
    await removeRefreshToken();
+   setAuthState(false);
 }

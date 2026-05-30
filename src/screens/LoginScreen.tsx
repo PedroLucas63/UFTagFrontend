@@ -12,13 +12,13 @@ import {
    Lock,
 } from "lucide-react-native";
 
-import { useNavigation } from "@react-navigation/native";
-
 import { login, logout } from "../api/auth";
 import { AlertModal } from "../components/AlertModal";
+import { Loading } from "../components/Loading";
+import { useAppNavigation } from "../navigation/types";
 
 export function LoginScreen() {
-   const navigation = useNavigation();
+   const navigation = useAppNavigation();
 
    const [email, setEmail] =
       useState("");
@@ -75,8 +75,7 @@ export function LoginScreen() {
             message: "Login realizado com sucesso",
          });
 
-         // TODO: navigate to main app screen
-         await logout();
+         return;
       } catch (error) {
          setAlertState({
             visible: true,
@@ -200,13 +199,19 @@ export function LoginScreen() {
                         : "bg-gray-400"
                         }`}
                   >
-                     <Text className="text-white font-semibold text-base">
-
-                        {loading
-                           ? "Entrando..."
-                           : "Entrar"}
-
-                     </Text>
+                     {loading ? (
+                        <Loading
+                           variant="inline"
+                           size="sm"
+                           color="#FFFFFF"
+                           message="Entrando..."
+                           textClassName="text-white font-semibold text-base"
+                        />
+                     ) : (
+                        <Text className="text-white font-semibold text-base">
+                           Entrar
+                        </Text>
+                     )}
                   </TouchableOpacity>
                </View>
 
