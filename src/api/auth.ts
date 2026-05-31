@@ -1,7 +1,9 @@
 import {
    removeAccessToken,
+   removePassword,
    removeRefreshToken,
    saveAccessToken,
+   savePassword,
    saveRefreshToken,
 } from "../storage/tokenStorage";
 import { setAuthState } from "../auth/authState";
@@ -51,6 +53,7 @@ export async function login(
 
    await saveAccessToken(accessToken);
    await saveRefreshToken(refreshToken);
+   await savePassword(password);
    setAuthState(true);
 
    return result;
@@ -90,5 +93,6 @@ export async function forgotPassword(
 export async function logout(): Promise<void> {
    await removeAccessToken();
    await removeRefreshToken();
+   await removePassword();
    setAuthState(false);
 }

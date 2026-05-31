@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const REFRESH_TOKEN_SERVICE = 'refresh-token';
 const ACCESS_TOKEN_KEY = 'access-token';
+const PASSWORD_KEY = 'password';
 
 export async function saveAccessToken(token: string) {
    await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
@@ -44,5 +45,36 @@ export async function getRefreshToken() {
 export async function removeRefreshToken() {
    await Keychain.resetGenericPassword({
       service: REFRESH_TOKEN_SERVICE,
+   });
+}
+
+export async function savePassword(
+   password: string
+) {
+   await Keychain.setGenericPassword(
+      'password',
+      password,
+      {
+         service: PASSWORD_KEY,
+      }
+   );
+}
+
+export async function getPassword() {
+   const credentials =
+      await Keychain.getGenericPassword({
+         service: PASSWORD_KEY,
+      });
+
+   if (!credentials) {
+      return null;
+   }
+
+   return credentials.password;
+}
+
+export async function removePassword() {
+   await Keychain.resetGenericPassword({
+      service: PASSWORD_KEY,
    });
 }

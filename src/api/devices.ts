@@ -6,6 +6,9 @@ export type DeviceResponse = {
    UserId: string;
    Name: string;
    IsActive: boolean;
+   EncryptedPrivateKey: string;
+   EncryptedPublicKey: string;
+   KeysSalt: string;
    CreatedAt: string;
 };
 
