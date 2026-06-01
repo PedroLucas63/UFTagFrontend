@@ -15,6 +15,7 @@ apiClient.interceptors.request.use(async (config) => {
       "/login",
       "/register",
       "/auth/refresh",
+      "/devices/public",
    ].some((path) => requestUrl.includes(path));
 
    if (skipAuth) {

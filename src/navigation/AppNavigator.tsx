@@ -11,6 +11,7 @@ import { ForgotPasswordScreen } from "../screens/ForgotPasswordScreen";
 import { SignupScreen } from "../screens/SignupScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { ScannerScreen } from "../screens/ScannerScreen";
 import { getAccessToken, getRefreshToken } from "../storage/tokenStorage";
 import { setAuthState, subscribeAuthState } from "../auth/authState";
 import { RootStackParamList } from "./types";
@@ -78,6 +79,11 @@ export function AppNavigator() {
                   <Stack.Screen
                      name="Settings"
                      component={SettingsScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="Scanner"
+                     component={ScannerScreen}
                      options={{ animation: "none" }}
                   />
                </>

@@ -20,3 +20,29 @@ export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {
       }
    );
 }
+
+export type PublicDeviceResponse = {
+   NameUser: string;
+   NameDevice: string;
+   PhoneNumber: string;
+   Email: string;
+   IsActive: boolean;
+};
+
+export async function getPublicDevice(id: string): Promise<ApiResult<PublicDeviceResponse>> {
+   return await request<PublicDeviceResponse>(
+      apiClient.get(`/devices/public/${id}`),
+      {
+         fallbackError: "Falha ao carregar informações do proprietário",
+      }
+   );
+}
+
+export async function createDevice(name: string, publicId: string): Promise<ApiResult<DeviceResponse>> {
+   return await request<DeviceResponse>(
+      apiClient.post("/devices", { name, publicId }),
+      {
+         fallbackError: "Falha ao cadastrar dispositivo",
+      }
+   );
+}
