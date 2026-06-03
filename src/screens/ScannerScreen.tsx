@@ -76,56 +76,67 @@ function RippleAnimation() {
    ];
 
    useEffect(() => {
-      const createAnimation = (value: Animated.Value, delay: number) => {
-         value.setValue(0);
-         return Animated.loop(
-            Animated.sequence([
-               Animated.delay(delay),
-               Animated.parallel([
-                  Animated.timing(value, {
-                     toValue: 1,
-                     duration: 3000,
-                     useNativeDriver: true,
-                  }),
-               ]),
-            ])
-         );
-      };
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
+      const animations: Animated.CompositeAnimation[] = [];
 
-      const anims = animatedValues.map((val, index) =>
-         createAnimation(val, index * 1000)
-      );
-      anims.forEach((anim) => anim.start());
+      animatedValues.forEach((value, index) => {
+         value.setValue(0);
+         const startAnim = () => {
+            const anim = Animated.loop(
+               Animated.timing(value, {
+                  toValue: 1,
+                  duration: 3000,
+                  useNativeDriver: true,
+               })
+            );
+            animations.push(anim);
+            anim.start();
+         };
+
+         if (index === 0) {
+            startAnim();
+         } else {
+            const t = setTimeout(startAnim, index * 1000);
+            timeouts.push(t);
+         }
+      });
 
       return () => {
-         anims.forEach((anim) => anim.stop());
+         timeouts.forEach(t => clearTimeout(t));
+         animations.forEach(anim => anim.stop());
       };
    }, []);
 
    return (
-      <View style={StyleSheet.absoluteFill} className="items-center justify-center">
-         {animatedValues.map((val, index) => {
-            const scale = val.interpolate({
+      <>
+         {animatedValues.map((value, index) => {
+            const scale = value.interpolate({
                inputRange: [0, 1],
-               outputRange: [0.8, 2.8],
+               outputRange: [1, 4], // cresce bastante
             });
-            const opacity = val.interpolate({
-               inputRange: [0, 0.2, 0.8, 1],
-               outputRange: [0, 0.4, 0.25, 0],
+
+            const opacity = value.interpolate({
+               inputRange: [0, 0.2, 1],
+               outputRange: [0.8, 0.4, 0],
             });
 
             return (
                <Animated.View
                   key={index}
                   style={{
+                     position: "absolute",
+                     width: 96, // mesmo tamanho do círculo central
+                     height: 96,
+                     borderRadius: 999,
+                     borderWidth: 3, // linhas mais elegantes e visíveis
+                     borderColor: "#3B82F6",
                      transform: [{ scale }],
                      opacity,
                   }}
-                  className="absolute w-44 h-44 rounded-full border border-blue-500/40"
                />
             );
          })}
-      </View>
+      </>
    );
 }
 
@@ -244,11 +255,13 @@ export function ScannerScreen() {
    // Executa ação de entrar em contato baseado nos campos retornados
    const handleContact = () => {
       if (!device) return;
+      const phoneNumber = device.phoneNumber;
+      const email = device.email;
 
-      if (device.PhoneNumber) {
-         Linking.openURL(`tel:${device.PhoneNumber.replace(/\D/g, "")}`);
-      } else if (device.Email) {
-         Linking.openURL(`mailto:${device.Email}`);
+      if (phoneNumber) {
+         Linking.openURL(`tel:${phoneNumber.replace(/\D/g, "")}`);
+      } else if (email) {
+         Linking.openURL(`mailto:${email}`);
       } else {
          Alert.alert("Aviso", "Nenhuma informação de contato disponível.");
       }
@@ -268,66 +281,54 @@ export function ScannerScreen() {
    if (state === "scanning") {
       return (
          <View className="flex-1 bg-[#0A1120] justify-center items-center px-6">
-            {/* Animação das Ondas */}
-            <RippleAnimation />
+            {/* Contêiner unificado do Ícone Central e das Ondas */}
+            <View className="items-center justify-center w-24 h-24 z-10">
+               {/* Animação das Ondas (Saindo exatamente do centro da imagem/figura) */}
+               <RippleAnimation />
 
-            {/* Ícone NFC central com waves brancas */}
-            <View className="w-24 h-24 rounded-full bg-blue-600 items-center justify-center shadow-2xl shadow-blue-500/50 z-10">
-               <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
-                  {/* Wi-fi/NFC Waves */}
-                  <Path
-                     d="M2 12C2 9.24 3.12 6.74 4.93 4.93"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                  />
-                  <Path
-                     d="M6 12C6 10.34 6.67 8.84 7.76 7.76"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                  />
-                  <Path
-                     d="M10 12C10 11.45 10.22 10.95 10.59 10.59"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                  />
-                  <Path
-                     d="M22 12C22 14.76 20.88 17.26 19.07 19.07"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                     transform="rotate(180 12 12)"
-                  />
-                  <Path
-                     d="M18 12C18 13.66 17.33 15.16 16.24 16.24"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                     transform="rotate(180 12 12)"
-                  />
-                  <Path
-                     d="M14 12C14 12.55 13.78 13.05 13.41 13.41"
-                     stroke="#FFFFFF"
-                     strokeWidth={3}
-                     strokeLinecap="round"
-                     transform="rotate(180 12 12)"
-                  />
-               </Svg>
+               {/* Ícone NFC central com a figura exata de Contactless do usuário (4 ondas brancas viradas para a direita) */}
+               <View className="w-24 h-24 rounded-full bg-blue-600 items-center justify-center shadow-lg shadow-blue-500/30">
+                  <Svg width={52} height={52} viewBox="0 0 24 24" fill="none">
+                     {/* 4 Ondas Concêntricas Brancas com pontas arredondadas e largura crescente */}
+                     <Path
+                        d="M 6.78 8.72 A 4 4 0 0 1 6.78 15.28"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                     />
+                     <Path
+                        d="M 8.49 6.26 A 7 7 0 0 1 8.49 17.74"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                     />
+                     <Path
+                        d="M 10.2 3.8 A 10 10 0 0 1 10.2 20.2"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                     />
+                     <Path
+                        d="M 11.91 1.34 A 13 13 0 0 1 11.91 22.66"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                     />
+                  </Svg>
+               </View>
             </View>
 
             {/* Textos Informativos */}
             <View className="items-center mt-12 z-10">
                <Text className="text-white text-2xl font-bold">Scanner NFC</Text>
                <Text className="text-slate-400 text-sm text-center mt-2 px-6">
-                  Aproxime a tag do aparelho para ler as informações.
+                  Aproxime a tag do aparelho
                </Text>
             </View>
 
             {/* Animação dos Três Pontos */}
             <View className="flex-row gap-2 mt-8 z-10">
-               <Text className="text-blue-500 text-lg font-bold">...</Text>
+               <Text className="text-blue-500 text-5xl font-bold">...</Text>
             </View>
 
             {/* Botão de Simulação (Apenas Dev/Ambiente Local) */}
@@ -392,7 +393,6 @@ export function ScannerScreen() {
       );
    }
 
-   // --- RENDER VISÃO ENCONTRADO (TELA BRANCA COM CARD) ---
    return (
       <View className="flex-1 bg-[#F8FAFC]">
          {/* Botão de Voltar */}
@@ -427,7 +427,7 @@ export function ScannerScreen() {
                   <View className="flex-1">
                      <Text className="text-slate-400 text-xs uppercase font-semibold tracking-wider">Nome da Tag</Text>
                      <Text className="text-slate-800 text-base font-bold mt-1">
-                        {device?.NameDevice || "Não fornecido"}
+                        {device?.nameDevice || "Não fornecido"}
                      </Text>
                   </View>
                </View>
@@ -440,13 +440,13 @@ export function ScannerScreen() {
                   <View className="flex-1">
                      <Text className="text-slate-400 text-xs uppercase font-semibold tracking-wider">Proprietário</Text>
                      <Text className="text-slate-800 text-base font-bold mt-1">
-                        {device?.NameUser || "Não fornecido"}
+                        {device?.nameUser || "Não fornecido"}
                      </Text>
                   </View>
                </View>
 
                {/* Item: E-mail */}
-               {device?.Email ? (
+               {device?.email ? (
                   <View className="flex-row items-start gap-4 border-b border-slate-100 pb-4 mb-4">
                      <View className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center">
                         <Mail size={20} color="#3B82F6" />
@@ -454,14 +454,14 @@ export function ScannerScreen() {
                      <View className="flex-1">
                         <Text className="text-slate-400 text-xs uppercase font-semibold tracking-wider">Email</Text>
                         <Text className="text-slate-600 text-sm mt-1 break-all">
-                           {device.Email}
+                           {device.email}
                         </Text>
                      </View>
                   </View>
                ) : null}
 
                {/* Item: Telefone */}
-               {device?.PhoneNumber ? (
+               {device?.phoneNumber ? (
                   <View className="flex-row items-start gap-4 pb-2">
                      <View className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center">
                         <Phone size={20} color="#3B82F6" />
@@ -469,7 +469,7 @@ export function ScannerScreen() {
                      <View className="flex-1">
                         <Text className="text-slate-400 text-xs uppercase font-semibold tracking-wider">Telefone</Text>
                         <Text className="text-slate-600 text-sm mt-1">
-                           {device.PhoneNumber}
+                           {device.phoneNumber}
                         </Text>
                      </View>
                   </View>
