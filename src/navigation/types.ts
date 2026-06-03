@@ -12,9 +12,17 @@ export type RootStackParamList = {
    Login: undefined;
    Signup: undefined;
 
+   TagInfo: {
+      deviceId: string;
+   };
+
    TagDetails: {
       tag: DeviceResponse;
    };
+
+   ConfigureTag: {
+      deviceId: string;
+   }
 };
 
 export function useAppNavigation() {

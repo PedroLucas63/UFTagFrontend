@@ -100,6 +100,7 @@ Para conectar com a API, use o reverse em ambos:
 
 ```sh
 adb reverse tcp:5156 tcp:5156
+adb reverse tcp:8081 tcp:8081
 ```
 
 If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.

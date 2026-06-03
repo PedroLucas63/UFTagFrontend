@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { setAuthState } from '../auth/authState';
-import { getAccessToken, getRefreshToken, removeAccessToken, removePassword, removeRefreshToken, saveAccessToken, savePassword, saveRefreshToken } from '../storage/tokenStorage';
+import { getAccessToken, getRefreshToken, removeAccessToken, removePassword, removeRefreshToken, saveAccessToken, saveRefreshToken } from '../storage/tokenStorage';
+
+const skipAuthEndpoints = [
+   "/login",
+   "/register",
+   "/auth/refresh",
+   "/devices/public",
+];
 
 export const apiClient = axios.create({
    baseURL: 'http://127.0.0.1:5156',
@@ -11,12 +18,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(async (config) => {
    const requestUrl = config.url ?? "";
-   const skipAuth = [
-      "/login",
-      "/register",
-      "/auth/refresh",
-      "/devices/public",
-   ].some((path) => requestUrl.includes(path));
+   const skipAuth = skipAuthEndpoints.some((path) => requestUrl.includes(path));
 
    if (skipAuth) {
       return config;
@@ -52,8 +54,16 @@ apiClient.interceptors.response.use(
 
    async (error) => {
       const originalRequest = error.config;
+      const requestUrl = originalRequest?.url ?? "";
+      const skipAuth = skipAuthEndpoints.some((path) => requestUrl.includes(path));
+
+      console.log("Response error:", error);
 
       if (error.response?.status !== 401) {
+         return Promise.reject(error);
+      }
+
+      if (skipAuth) {
          return Promise.reject(error);
       }
 

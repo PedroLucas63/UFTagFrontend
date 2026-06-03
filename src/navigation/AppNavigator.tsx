@@ -16,6 +16,9 @@ import { getAccessToken, getRefreshToken } from "../storage/tokenStorage";
 import { setAuthState, subscribeAuthState } from "../auth/authState";
 import { RootStackParamList } from "./types";
 import { Loading } from "../components/Loading";
+import { TagInfoScreen } from "../screens/TagInfoScreen";
+import { AddTagScreen } from "../screens/AddTagScreen";
+import { ConfigureTagScreen } from "../screens/ConfigureTagScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -84,6 +87,21 @@ export function AppNavigator() {
                   <Stack.Screen
                      name="Scanner"
                      component={ScannerScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="TagInfo"
+                     component={TagInfoScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="Add"
+                     component={AddTagScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="ConfigureTag"
+                     component={ConfigureTagScreen}
                      options={{ animation: "none" }}
                   />
                </>
