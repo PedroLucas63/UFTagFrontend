@@ -22,11 +22,11 @@ export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {
 }
 
 export type PublicDeviceResponse = {
-   NameUser: string;
-   NameDevice: string;
-   PhoneNumber: string;
-   Email: string;
-   IsActive: boolean;
+   nameUser?: string;
+   nameDevice?: string;
+   phoneNumber?: string;
+   email?: string;
+   isActive?: boolean;
 };
 
 export async function getPublicDevice(id: string): Promise<ApiResult<PublicDeviceResponse>> {
