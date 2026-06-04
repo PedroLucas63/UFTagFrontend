@@ -4,9 +4,9 @@ import { Battery, MapPin, Clock } from "lucide-react-native";
 
 interface TagCardProps {
    name: string;
-   battery: number;
+   battery: number | null;
    location: string;
-   lastUpdate: string;
+   lastUpdate: string | null;
    isNear: boolean;
    onClick?: () => void;
 }
@@ -19,6 +19,10 @@ export function TagCard({
    isNear,
    onClick,
 }: TagCardProps) {
+   if (battery === null) {
+      battery = 0; // ou algum valor padrão para indicar que a bateria é desconhecida
+   }
+
    const batteryColor =
       battery > 50
          ? "#22C55E"

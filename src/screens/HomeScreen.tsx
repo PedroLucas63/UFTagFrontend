@@ -7,11 +7,12 @@ import { BottomNav } from "../components/BottomNav";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
 import { DeviceResponse, getDevices } from "../api/devices";
+import { LocalDevice } from "../storage/devicesStorage";
 
 export function HomeScreen() {
    const navigation = useAppNavigation();
 
-   const [tags, setTags] = useState<DeviceResponse[]>([]);
+   const [tags, setTags] = useState<LocalDevice[]>([]);
    const [loading, setLoading] = useState(true);
    const [tagsError, setTagsError] = useState<string | null>(null);
 
@@ -116,10 +117,10 @@ export function HomeScreen() {
                      <TagCard
                         key={tag.id}
                         name={tag.name}
-                        battery={100} // TODO: replace with real battery level
-                        location={"Campus UFSC"} // TODO: replace with real location
-                        lastUpdate={"10 minutos atrás"} // TODO: replace with real last update time
-                        isNear={true} // TODO: replace with real proximity status
+                        battery={tag.battery}
+                        location={tag.locationText}
+                        lastUpdate={tag.lastUpdate}
+                        isNear={tag.isNear}
                         onClick={() => handleTagClick(tag)}
                      />
                   ))

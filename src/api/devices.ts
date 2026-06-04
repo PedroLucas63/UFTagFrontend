@@ -1,6 +1,6 @@
-import { saveDevices } from "../storage/devicesStorage";
+import { createLocalDevice, getLocalDevices, LocalDevice, saveDevices } from "../storage/devicesStorage";
 import { apiClient } from "./client";
-import { ApiResult, request } from "./request";
+import { ApiFailure, ApiResult, ApiSuccess, request } from "./request";
 
 export type DeviceResponse = {
    id: string;
@@ -13,20 +13,44 @@ export type DeviceResponse = {
    createdAt: string;
 };
 
-export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {
-   const devices = await request<DeviceResponse[]>(
-      apiClient.get("/devices"),
-      {
-         fallbackError: "Falha ao carregar dispositivos",
-      }
-   );
+export async function getDevices(): Promise<ApiResult<LocalDevice[]>> {
+   const localDevices = await getLocalDevices();
 
-   if (devices.ok) {
-      await saveDevices(devices.data);
+   if (localDevices.needsBackgroundSync) {
+      const response = await request<DeviceResponse[]>(
+         apiClient.get("/devices"),
+         {
+            fallbackError: "Falha ao carregar dispositivos",
+         }
+      );
+
+      if (response.ok) {
+         await saveDevices(response.data);
+         const result: ApiSuccess<LocalDevice[]> = {
+            ok: true,
+            data: response.data.map(createLocalDevice),
+            status: response.status,
+         };
+         return result;
+      } else {
+         const result: ApiFailure = {
+            ok: false,
+            error: response.error,
+            status: response.status,
+         };
+         return result;
+      }
    }
 
-   return devices;
+   const result: ApiSuccess<LocalDevice[]> = {
+      ok: true,
+      data: localDevices.devices,
+      status: 200,
+   };
+   return result;
 }
+
+
 
 export type PublicDeviceResponse = {
    nameUser?: string;
