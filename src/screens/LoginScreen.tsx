@@ -187,18 +187,6 @@ export function LoginScreen() {
                   </View>
 
                   <TouchableOpacity
-                     onPress={() =>
-                        navigation.navigate(
-                           "ForgotPassword" as never
-                        )
-                     }
-                  >
-                     <Text className="text-blue-600 text-sm">
-                        Perdi minha senha
-                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
                      onPress={
                         handleLogin
                      }

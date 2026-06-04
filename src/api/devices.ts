@@ -1,24 +1,31 @@
+import { saveDevices } from "../storage/devicesStorage";
 import { apiClient } from "./client";
 import { ApiResult, request } from "./request";
 
 export type DeviceResponse = {
-   Id: string;
-   UserId: string;
-   Name: string;
-   IsActive: boolean;
-   EncryptedPrivateKey: string;
-   EncryptedPublicKey: string;
-   KeysSalt: string;
-   CreatedAt: string;
+   id: string;
+   userId: string;
+   name: string;
+   isActive: boolean;
+   encryptedPrivateKey: string;
+   encryptedPublicKey: string;
+   keysSalt: string;
+   createdAt: string;
 };
 
 export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {
-   return await request<DeviceResponse[]>(
+   const devices = await request<DeviceResponse[]>(
       apiClient.get("/devices"),
       {
          fallbackError: "Falha ao carregar dispositivos",
       }
    );
+
+   if (devices.ok) {
+      await saveDevices(devices.data);
+   }
+
+   return devices;
 }
 
 export type PublicDeviceResponse = {
@@ -38,9 +45,19 @@ export async function getPublicDevice(id: string): Promise<ApiResult<PublicDevic
    );
 }
 
-export async function createDevice(name: string, publicId: string): Promise<ApiResult<DeviceResponse>> {
+export type CreateDeviceRequest = {
+   Name: string;
+   PublicId: string;
+   EncryptedPublicKey: string;
+   EncryptedPrivateKey: string;
+   KeysSalt: string;
+};
+
+export async function createDevice(
+   device: CreateDeviceRequest
+): Promise<ApiResult<DeviceResponse>> {
    return await request<DeviceResponse>(
-      apiClient.post("/devices", { name, publicId }),
+      apiClient.post("/devices", device),
       {
          fallbackError: "Falha ao cadastrar dispositivo",
       }

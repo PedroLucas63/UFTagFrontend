@@ -73,11 +73,7 @@ export function HomeScreen() {
                </Text>
 
                <View className="flex-row items-center gap-3">
-                  <TouchableOpacity className="p-2 rounded-full">
-                     <Bell size={22} color="#334155" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity className="p-1">
+                  <TouchableOpacity className="p-1" onPress={() => navigation.navigate("Settings")}>
                      <View className="w-9 h-9 bg-blue-600 rounded-full items-center justify-center">
                         <User size={18} color="#FFFFFF" />
                      </View>
@@ -118,8 +114,8 @@ export function HomeScreen() {
                ) : (
                   tags.map((tag) => (
                      <TagCard
-                        key={tag.Id}
-                        name={tag.Name}
+                        key={tag.id}
+                        name={tag.name}
                         battery={100} // TODO: replace with real battery level
                         location={"Campus UFSC"} // TODO: replace with real location
                         lastUpdate={"10 minutos atrás"} // TODO: replace with real last update time

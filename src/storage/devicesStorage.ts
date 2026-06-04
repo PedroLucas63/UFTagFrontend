@@ -17,16 +17,16 @@ export async function saveDevices(devices: DeviceResponse[]) {
    }
 
    for (const device of devices) {
-      const defaultKey = `${DEVICE_KEY}.${device.Id}`;
+      const defaultKey = `${DEVICE_KEY}.${device.id}`;
       const keysSalt = new Uint8Array(
-         Buffer.from(device.KeysSalt, "base64")
+         Buffer.from(device.keysSalt, "base64")
       );
 
       const masterKey = await deriveKey(pass, keysSalt);
       const keyPair = decryptWithMasterKey(
          {
-            publicKeyEncrypted: device.EncryptedPublicKey,
-            privateKeyEncrypted: device.EncryptedPrivateKey,
+            publicKeyEncrypted: device.encryptedPublicKey,
+            privateKeyEncrypted: device.encryptedPrivateKey,
          },
          masterKey,
       )
