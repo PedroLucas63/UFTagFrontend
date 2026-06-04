@@ -19,6 +19,7 @@ import { Loading } from "../components/Loading";
 import { TagInfoScreen } from "../screens/TagInfoScreen";
 import { AddTagScreen } from "../screens/AddTagScreen";
 import { ConfigureTagScreen } from "../screens/ConfigureTagScreen";
+import { MapScreen } from '../screens/MapScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -102,6 +103,11 @@ export function AppNavigator() {
                   <Stack.Screen
                      name="ConfigureTag"
                      component={ConfigureTagScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                     name="Map"
+                     component={MapScreen}
                      options={{ animation: "none" }}
                   />
                </>

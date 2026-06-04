@@ -7,6 +7,7 @@ import { BottomNav } from "../components/BottomNav";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
 import { DeviceResponse, getDevices } from "../api/devices";
+import { saveDevices } from "../storage/devicesStorage";
 
 export function HomeScreen() {
    const navigation = useAppNavigation();
@@ -28,6 +29,8 @@ export function HomeScreen() {
 
             if (result.ok) {
                setTags(result.data);
+               await saveDevices(result.ok ? result.data : []);
+
                setTagsError(null);
                return;
             }

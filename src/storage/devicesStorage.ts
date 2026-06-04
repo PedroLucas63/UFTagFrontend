@@ -38,15 +38,36 @@ export async function saveDevices(devices: DeviceResponse[]) {
          `${defaultKey}.${PUBLIC_KEY}`,
          publicKey,
          {
-            service: PUBLIC_KEY,
+            service: `device.${device.Id}.publicKey`,
          }
       );
       await Keychain.setGenericPassword(
          `${defaultKey}.${PRIVATE_KEY}`,
          privateKey,
          {
-            service: PRIVATE_KEY,
+            service: `device.${device.Id}.privateKey`,
          }
       );
    }
+}
+
+export async function getDeviceKeys(deviceId: string): Promise<{
+   publicKey: Uint8Array;
+   privateKey: Uint8Array;
+}>{
+   const publicKeyEntry = await Keychain.getGenericPassword({
+      service: `device.${deviceId}.publicKey`,
+   });
+   const privateKeyEntry = await Keychain.getGenericPassword({
+      service: `device.${deviceId}.privateKey`,
+   });
+
+   if (!publicKeyEntry || !privateKeyEntry) {
+      throw new Error('Device keys not found');
+   }
+
+   return {
+      publicKey: new Uint8Array(Buffer.from(publicKeyEntry.password, "base64")),
+      privateKey: new Uint8Array(Buffer.from(privateKeyEntry.password, "base64")),
+   };
 }
