@@ -17,7 +17,7 @@ export function RippleAnimation() {
             const animation = Animated.loop(
                Animated.timing(value, {
                   toValue: 1,
-                  duration: 2500,
+                  duration: 1500, // 1 segundo de duração para cada ciclo
                   useNativeDriver: true,
                })
             );
@@ -32,7 +32,7 @@ export function RippleAnimation() {
             start();
          } else {
             timeouts.push(
-               setTimeout(start, index * 500)
+               setTimeout(start, index * 150) // 200ms de atraso para dar o efeito de um círculo dentro do outro
             );
          }
       });
@@ -48,12 +48,12 @@ export function RippleAnimation() {
          {animatedValues.map((value, index) => {
             const scale = value.interpolate({
                inputRange: [0, 1],
-               outputRange: [1, 2.5],
+               outputRange: [0.2, 1.7], // Começa menor perto do ícone e expande mais para fora
             });
 
             const opacity = value.interpolate({
-               inputRange: [0, 0.3, 1],
-               outputRange: [0.8, 0.4, 0],
+               inputRange: [0, 0.2, 1],
+               outputRange: [0.7, 0.4, 0], // Vai ficando mais transparente conforme cresce
             });
 
             return (
@@ -64,8 +64,8 @@ export function RippleAnimation() {
                      width: 192,
                      height: 192,
                      borderRadius: 999,
-                     borderWidth: 4,
-                     borderColor: "#2563EB",
+                     borderWidth: 4, 
+                     borderColor: "#3B82F6",
                      transform: [{ scale }],
                      opacity,
                   }}

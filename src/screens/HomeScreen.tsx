@@ -121,8 +121,8 @@ export function HomeScreen() {
                ) : (
                   tags.map((tag) => (
                      <TagCard
-                        key={tag.Id}
-                        name={tag.Name}
+                        key={tag.id}
+                        name={tag.name}
                         battery={100} // TODO: replace with real battery level
                         location={"Campus UFSC"} // TODO: replace with real location
                         lastUpdate={"10 minutos atrás"} // TODO: replace with real last update time

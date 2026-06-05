@@ -47,7 +47,7 @@ export function Loading({
       );
 
       const animation = Animated.loop(
-         Animated.stagger(150, sequences)
+         Animated.stagger(200, sequences)
       );
 
       animation.start();

@@ -2,14 +2,14 @@ import { apiClient } from "./client";
 import { ApiResult, request } from "./request";
 
 export type DeviceResponse = {
-   Id: string;
-   UserId: string;
-   Name: string;
-   IsActive: boolean;
-   EncryptedPrivateKey: string;
-   EncryptedPublicKey: string;
-   KeysSalt: string;
-   CreatedAt: string;
+   id: string;
+   userId: string;
+   name: string;
+   isActive: boolean;
+   encryptedPrivateKey: string;
+   encryptedPublicKey: string;
+   keysSalt: string;
+   createdAt: string;
 };
 
 export async function getDevices(): Promise<ApiResult<DeviceResponse[]>> {

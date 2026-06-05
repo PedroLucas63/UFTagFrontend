@@ -7,7 +7,7 @@ import {
    ScrollView,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { RefreshCw, Battery, Signal, Clock } from 'lucide-react-native';
+import { RefreshCw, Battery, Signal, Clock, MapPin } from 'lucide-react-native';
 import { BottomNav } from '../components/BottomNav';
 import { getDevices, DeviceResponse } from '../api/devices';
 import { getLatestLocationsByKeys, LocationResponse } from '../api/locations';
@@ -30,6 +30,76 @@ const INITIAL_REGION = {
     longitudeDelta: 0.05,
 };
 
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // Raio da Terra em metros
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+        Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+        Math.cos(phi1) *
+            Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) *
+            Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
+const WHITE_MAP_STYLE = [
+  {
+    "featureType": "all",
+    "elementType": "labels",
+    "stylers": [
+      { "visibility": "off" }
+    ]
+  },
+  {
+    "featureType": "landscape",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#f8f9fa" }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#e9ecef" }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#dee2e6" }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#e2e8f0" }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#f8f9fa" }
+    ]
+  },
+  {
+    "featureType": "transit",
+    "elementType": "geometry",
+    "stylers": [
+      { "color": "#f8f9fa" }
+    ]
+  }
+];
+
 
 
 export function MapScreen() {
@@ -38,6 +108,27 @@ export function MapScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedPin, setSelectedPin] = useState<DevicePin | null>(null);
+    const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+    function getMarkerColor(pin: DevicePin) {
+        if (!userLocation) {
+            return '#10B981'; // Verde por padrão se não souber a localização do usuário
+        }
+        const distance = getDistanceInMeters(
+            userLocation.latitude,
+            userLocation.longitude,
+            pin.coords.latitude,
+            pin.coords.longitude
+        );
+
+        if (distance < 50) {
+            return '#10B981'; // Verde (< 50m)
+        } else if (distance < 200) {
+            return '#F59E0B'; // Laranja (50m - 200m)
+        } else {
+            return '#EF4444'; // Vermelho (> 200m)
+        }
+    }
     
     const loadLocations = useCallback(async () => {
         try {
@@ -60,17 +151,13 @@ export function MapScreen() {
             const keyEntries: { device: DeviceResponse; publicKeyB64: string; privateKey: Uint8Array; publicKey: Uint8Array }[] = [];
             for (const device of devices) {
                 try {
-                    const { publicKey, privateKey } = await getDeviceKeys(device.Id);
+                    const { publicKey, privateKey } = await getDeviceKeys(device.id);
                     const { Buffer } = require('buffer');
                     const publicKeyB64 = Buffer.from(publicKey).toString('base64');
                     keyEntries.push({ device, publicKeyB64, publicKey, privateKey });
                 } catch {
                 // Device sem chaves no Keychain
                 }
-            }
-            if (keyEntries.length === 0) {
-                setError('Nenhuma chave encontrada. Abra o app e aguarde sincronizar.');
-                return;
             }
 
             const keys = keyEntries.map((e) => e.publicKeyB64);
@@ -175,19 +262,43 @@ export function MapScreen() {
                   <MapView
                         ref={mapRef}
                         provider={PROVIDER_GOOGLE}
-                        className="flex-1"
+                        style={{ flex: 1 }}
                         initialRegion={INITIAL_REGION}
                         showsUserLocation
                         showsMyLocationButton
+                        customMapStyle={WHITE_MAP_STYLE}
+                        onUserLocationChange={(event) => {
+                            const coords = event.nativeEvent.coordinate;
+                            if (coords) {
+                                setUserLocation({
+                                    latitude: coords.latitude,
+                                    longitude: coords.longitude,
+                                });
+                            }
+                        }}
                   >
                      {pins.map((pin) => (
                         <Marker
-                           key={pin.device.Id}
+                           key={pin.device.id}
                            coordinate={pin.coords}
-                           title={pin.device.Name}
-                           pinColor="#2563EB"
                            onPress={() => setSelectedPin(pin)}
-                        />
+                        >
+                           <View className="items-center">
+                              {/* Círculo do Marcador */}
+                              <View 
+                                 style={{ backgroundColor: getMarkerColor(pin) }} 
+                                 className="w-10 h-10 rounded-full border-2 border-white items-center justify-center shadow-lg"
+                              >
+                                 <MapPin size={18} color="#FFFFFF" />
+                              </View>
+                              {/* Balão com o Nome */}
+                              <View className="mt-1 bg-white rounded-full px-3 py-1 shadow border border-slate-100">
+                                 <Text className="text-slate-800 text-[11px] font-bold">
+                                    {pin.device.name}
+                                 </Text>
+                              </View>
+                           </View>
+                        </Marker>
                      ))}
                   </MapView>
                   {/* Card flutuante ao selecionar marcador */}
@@ -196,7 +307,7 @@ export function MapScreen() {
                         <View className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100">
                            <View className="flex-row items-center justify-between mb-3">
                               <Text className="text-base font-semibold text-slate-900">
-                                 {selectedPin.device.Name}
+                                 {selectedPin.device.name}
                               </Text>
                               <TouchableOpacity
                                  onPress={() => setSelectedPin(null)}
