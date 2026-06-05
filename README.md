@@ -82,6 +82,19 @@ You've successfully run and modified your React Native App. :partying_face:
 - If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
 - If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
 
+# Configuração
+
+## Chave do Google Maps
+Este projeto utiliza a API do Google Maps para renderizar mapas. Por motivos de segurança, a chave de API do Google não deve ser commitada no repositório.
+
+Para configurar a chave no seu ambiente de desenvolvimento local:
+
+1. Abra (ou crie) o arquivo `android/local.properties` no diretório `UFTagFrontend`.
+2. Adicione a seguinte linha, substituindo pela sua chave de API do Google Cloud:
+   ```properties
+   MAPS_API_KEY=SUA_CHAVE_API_DO_GOOGLE
+   ```
+
 # Troubleshooting
 
 ## Android (ADB)
