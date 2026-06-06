@@ -4,7 +4,6 @@ import { LocalDevice } from "../storage/devicesStorage";
 
 export type RootStackParamList = {
    Home: undefined;
-   Map: undefined;
    Add: undefined;
    Scanner: undefined;
    Settings: undefined;
@@ -23,6 +22,10 @@ export type RootStackParamList = {
    ConfigureTag: {
       deviceId: string;
    }
+
+   Map: {
+      deviceId?: string;
+   } | undefined;
 };
 
 export function useAppNavigation() {

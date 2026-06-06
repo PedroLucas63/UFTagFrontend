@@ -1,242 +1,238 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-   View,
-   Text,
-   TouchableOpacity,
-   ActivityIndicator,
-   ScrollView,
-} from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { RefreshCw, Battery, Signal, Clock, MapPin } from 'lucide-react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View, PermissionsAndroid, Platform } from 'react-native';
+import { Map, Camera, Marker, UserLocation } from '@maplibre/maplibre-react-native';
+import Geolocation, {
+   GeoPosition,
+   GeoError,
+} from 'react-native-geolocation-service';
+import { RefreshCw, Battery, Signal, Clock, MapPin, Map as MapIcon } from 'lucide-react-native';
 import { BottomNav } from '../components/BottomNav';
-import { getDevices, DeviceResponse } from '../api/devices';
-import { getLatestLocationsByKeys, LocationResponse } from '../api/locations';
-import { getDeviceKeys } from '../storage/devicesStorage';
-import { decryptWithPrivateKey } from '../crypto/asymmetric';
+import { getLatestLocationsByKeys } from '../api/locations';
+import { getLocalDevices, LocalDevice } from '../storage/devicesStorage';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { locationService } from '../services/LocationService';
 
 type Coords = {
-    latitude: number;
-    longitude: number;
+   latitude: number;
+   longitude: number;
 };
-type DevicePin = {
-    device: DeviceResponse;
-    location: LocationResponse;
-    coords: Coords;
+
+const DEFAULT_CENTER: Coords = {
+   latitude: -27.5954,
+   longitude: -48.548,
 };
-const INITIAL_REGION = {
-    latitude: -27.5954,
-    longitude: -48.548,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-};
+
+const DEFAULT_ZOOM = 12;
+const TARGET_ZOOM = 16;
+
+const OSM_STYLE = {
+   version: 8,
+   sources: {
+      osm: {
+         type: 'raster',
+         tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+         tileSize: 256,
+         maxzoom: 19,
+         attribution: '© OpenStreetMap contributors',
+      },
+   },
+   layers: [
+      {
+         id: 'osm-raster',
+         type: 'raster',
+         source: 'osm',
+      },
+   ],
+} as const;
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371e3; // Raio da Terra em metros
-    const phi1 = (lat1 * Math.PI) / 180;
-    const phi2 = (lat2 * Math.PI) / 180;
-    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+   const R = 6371e3;
+   const phi1 = (lat1 * Math.PI) / 180;
+   const phi2 = (lat2 * Math.PI) / 180;
+   const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+   const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
 
-    const a =
-        Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-        Math.cos(phi1) *
-            Math.cos(phi2) *
-            Math.sin(deltaLambda / 2) *
-            Math.sin(deltaLambda / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) *
+      Math.cos(phi2) *
+      Math.sin(deltaLambda / 2) *
+      Math.sin(deltaLambda / 2);
 
-    return R * c;
+   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   return R * c;
 }
 
-const WHITE_MAP_STYLE = [
-  {
-    "featureType": "all",
-    "elementType": "labels",
-    "stylers": [
-      { "visibility": "off" }
-    ]
-  },
-  {
-    "featureType": "landscape",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#f8f9fa" }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#e9ecef" }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#dee2e6" }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#e2e8f0" }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#f8f9fa" }
-    ]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "geometry",
-    "stylers": [
-      { "color": "#f8f9fa" }
-    ]
-  }
-];
+function formatDate(iso: string | null) {
+   if (!iso) return '-';
 
+   const d = new Date(iso);
+   return d.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+   });
+}
 
+async function requestAndroidLocationPermission(): Promise<boolean> {
+   if (Platform.OS !== 'android') return true;
+
+   const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+   );
+
+   return result === PermissionsAndroid.RESULTS.GRANTED;
+}
+
+type RouteParams = {
+   deviceId?: string;
+};
 
 export function MapScreen() {
-    const mapRef = useRef<MapView>(null);
-    const [pins, setPins] = useState<DevicePin[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedPin, setSelectedPin] = useState<DevicePin | null>(null);
-    const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+   const route = useRoute();
 
-    function getMarkerColor(pin: DevicePin) {
-        if (!userLocation) {
-            return '#10B981'; // Verde por padrão se não souber a localização do usuário
-        }
-        const distance = getDistanceInMeters(
-            userLocation.latitude,
-            userLocation.longitude,
-            pin.coords.latitude,
-            pin.coords.longitude
-        );
+   const deviceId =
+      (route.params as RouteParams | undefined)?.deviceId;
 
-        if (distance < 50) {
-            return '#10B981'; // Verde (< 50m)
-        } else if (distance < 200) {
-            return '#F59E0B'; // Laranja (50m - 200m)
-        } else {
-            return '#EF4444'; // Vermelho (> 200m)
-        }
-    }
-    
-    const loadLocations = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            setSelectedPin(null);
+   const cameraRef = useRef<any>(null);
 
-            const devicesResult = await getDevices();
-            if (!devicesResult.ok) {
-                setError(devicesResult.error);
-                return;
+   const [devices, setDevices] = useState<LocalDevice[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [selectedPin, setSelectedPin] = useState<LocalDevice | null>(null);
+   const [userLocation, setUserLocation] = useState<Coords | null>(null);
+   const [mapReady, setMapReady] = useState(false);
+
+   const [initialViewState, setInitialViewState] = useState({
+      center: [DEFAULT_CENTER.longitude, DEFAULT_CENTER.latitude] as [number, number],
+      zoom: DEFAULT_ZOOM,
+   });
+
+   function getMarkerColor(device: LocalDevice) {
+      if (!userLocation || device.locationLat === null || device.locationLng === null) {
+         return '#10B981';
+      }
+
+      const distance = getDistanceInMeters(
+         userLocation.latitude,
+         userLocation.longitude,
+         device.locationLat,
+         device.locationLng,
+      );
+
+      if (distance < 50) return '#10B981';
+      if (distance < 200) return '#F59E0B';
+      return '#EF4444';
+   }
+
+   const centerMap = useCallback((coords: Coords, zoom = TARGET_ZOOM) => {
+      cameraRef.current?.flyTo({
+         center: [coords.longitude, coords.latitude],
+         duration: 900,
+      });
+
+      cameraRef.current?.zoomTo(zoom, {
+         duration: 900,
+      });
+   }, []);
+
+   const loadLocations = useCallback(async () => {
+      try {
+         setLoading(true);
+         setError(null);
+         setSelectedPin(null);
+
+         const locsResult = await getLatestLocationsByKeys();
+         if (!locsResult.ok) {
+            console.warn('Falha ao atualizar API, mostrando dados do cache local.');
+         }
+
+         const { devices: localDevices } = await getLocalDevices();
+
+         const validDevices = localDevices.filter(
+            (d) => d.locationLat !== null && d.locationLng !== null,
+         );
+
+         if (validDevices.length === 0 && !locsResult.ok) {
+            setError(locsResult.error || 'Falha ao carregar localizações');
+            return;
+         }
+
+         setDevices(validDevices);
+
+         const gps = await locationService.getCurrentPosition();
+         setUserLocation(gps);
+
+         if (deviceId) {
+            const targetDevice = validDevices.find((d) => d.id === deviceId);
+            if (targetDevice && targetDevice.locationLat !== null && targetDevice.locationLng !== null) {
+               const targetCoords = {
+                  latitude: targetDevice.locationLat,
+                  longitude: targetDevice.locationLng,
+               };
+
+               setInitialViewState({
+                  center: [targetCoords.longitude, targetCoords.latitude],
+                  zoom: TARGET_ZOOM,
+               });
+
+               setSelectedPin(targetDevice);
+
+               if (mapReady) {
+                  centerMap(targetCoords, TARGET_ZOOM);
+               }
+            } else if (gps) {
+               setInitialViewState({
+                  center: [gps.longitude, gps.latitude],
+                  zoom: DEFAULT_ZOOM,
+               });
             }
-            const devices = devicesResult.data;
-            if (devices.length === 0) {
-                setPins([]);
-                return;
-            }
+         } else if (gps) {
+            setInitialViewState({
+               center: [gps.longitude, gps.latitude],
+               zoom: DEFAULT_ZOOM,
+            });
 
-        
-            const keyEntries: { device: DeviceResponse; publicKeyB64: string; privateKey: Uint8Array; publicKey: Uint8Array }[] = [];
-            for (const device of devices) {
-                try {
-                    const { publicKey, privateKey } = await getDeviceKeys(device.id);
-                    const { Buffer } = require('buffer');
-                    const publicKeyB64 = Buffer.from(publicKey).toString('base64');
-                    keyEntries.push({ device, publicKeyB64, publicKey, privateKey });
-                } catch {
-                // Device sem chaves no Keychain
-                }
+            if (mapReady) {
+               centerMap(gps, DEFAULT_ZOOM);
             }
+         } else {
+            setInitialViewState({
+               center: [DEFAULT_CENTER.longitude, DEFAULT_CENTER.latitude],
+               zoom: DEFAULT_ZOOM,
+            });
+         }
+      } catch (e) {
+         setError(e instanceof Error ? e.message : 'Erro inesperado');
+      } finally {
+         setLoading(false);
+      }
+   }, [centerMap, mapReady, deviceId]);
 
-            const keys = keyEntries.map((e) => e.publicKeyB64);
-            const locsResult = await getLatestLocationsByKeys(keys);
-            if (!locsResult.ok) {
-                setError(locsResult.error);
-                return;
-            }
-
-            const locations = locsResult.data;
-            const newPins: DevicePin[] = [];
-            for (const loc of locations) {
-                const entry = keyEntries.find((e) => e.publicKeyB64 === loc.key);
-                if (!entry) continue;
-                try {
-                    const plainJson = await decryptWithPrivateKey(
-                        loc.locationEncrypted,
-                        entry.publicKey,
-                        entry.privateKey,
-                    );
-                    const coords: Coords = JSON.parse(plainJson);
-                    if (
-                        typeof coords.latitude === 'number' &&
-                        typeof coords.longitude === 'number'
-                    ) {
-                        newPins.push({ device: entry.device, location: loc, coords });
-                    }
-                } catch {
-                // Falha na descriptografia deste device — pular
-                }
-            }
-            setPins(newPins);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Erro inesperado');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-    useEffect(() => {
-        loadLocations();
+   useEffect(() => {
+      loadLocations();
    }, [loadLocations]);
-
-    
-    function formatDate(iso: string) {
-        const d = new Date(iso);
-        return d.toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-
 
    return (
       <View className="flex-1 bg-slate-50">
-         {/* Header */}
          <View className="bg-white border-b border-slate-200 px-5 pb-4 mt-12">
             <View className="flex-row items-center justify-between max-w-md mx-auto w-full">
-               <Text className="text-xl font-semibold text-slate-900">
-                  Mapa
-               </Text>
+               <Text className="text-xl font-semibold text-slate-900">Mapa</Text>
+
                <TouchableOpacity
                   onPress={loadLocations}
                   disabled={loading}
                   className="p-2 rounded-full"
                   activeOpacity={0.7}
                >
-                  <RefreshCw
-                     size={20}
-                     color={loading ? '#CBD5E1' : '#334155'}
-                  />
+                  <RefreshCw size={20} color={loading ? '#CBD5E1' : '#334155'} />
                </TouchableOpacity>
             </View>
          </View>
-         {/* Mapa */}
+
          <View className="flex-1">
-            {loading ? (
+            {loading && devices.length === 0 ? (
                <View className="flex-1 items-center justify-center">
                   <ActivityIndicator size="large" color="#2563EB" />
                   <Text className="text-slate-500 text-sm mt-3">
@@ -252,63 +248,61 @@ export function MapScreen() {
                      onPress={loadLocations}
                      className="bg-blue-600 rounded-2xl py-3 px-6"
                   >
-                     <Text className="text-white font-semibold">
-                        Tentar novamente
-                     </Text>
+                     <Text className="text-white font-semibold">Tentar novamente</Text>
                   </TouchableOpacity>
                </View>
             ) : (
                <>
-                  <MapView
-                        ref={mapRef}
-                        provider={PROVIDER_GOOGLE}
-                        style={{ flex: 1 }}
-                        initialRegion={INITIAL_REGION}
-                        showsUserLocation
-                        showsMyLocationButton
-                        customMapStyle={WHITE_MAP_STYLE}
-                        onUserLocationChange={(event) => {
-                            const coords = event.nativeEvent.coordinate;
-                            if (coords) {
-                                setUserLocation({
-                                    latitude: coords.latitude,
-                                    longitude: coords.longitude,
-                                });
-                            }
-                        }}
+                  <Map
+                     style={{ flex: 1 }}
+                     mapStyle={OSM_STYLE}
+                     onDidFinishLoadingStyle={() => setMapReady(true)}
                   >
-                     {pins.map((pin) => (
-                        <Marker
-                           key={pin.device.id}
-                           coordinate={pin.coords}
-                           onPress={() => setSelectedPin(pin)}
-                        >
-                           <View className="items-center">
-                              {/* Círculo do Marcador */}
-                              <View 
-                                 style={{ backgroundColor: getMarkerColor(pin) }} 
-                                 className="w-10 h-10 rounded-full border-2 border-white items-center justify-center shadow-lg"
-                              >
-                                 <MapPin size={18} color="#FFFFFF" />
+                     <Camera
+                        ref={cameraRef}
+                        initialViewState={initialViewState}
+                     />
+
+                     <UserLocation animated accuracy heading />
+
+                     {devices.map((device) => {
+                        if (device.locationLat === null || device.locationLng === null) {
+                           return null;
+                        }
+
+                        return (
+                           <Marker
+                              key={device.id}
+                              lngLat={[device.locationLng, device.locationLat]}
+                              onPress={() => setSelectedPin(device)}
+                           >
+                              <View className="items-center">
+                                 <View
+                                    style={{ backgroundColor: getMarkerColor(device) }}
+                                    className="w-10 h-10 rounded-full border-2 border-white items-center justify-center shadow-lg"
+                                 >
+                                    <MapPin size={18} color="#FFFFFF" />
+                                 </View>
+
+                                 <View className="mt-1 bg-white rounded-full px-3 py-1 shadow border border-slate-100">
+                                    <Text className="text-slate-800 text-[11px] font-bold">
+                                       {device.name}
+                                    </Text>
+                                 </View>
                               </View>
-                              {/* Balão com o Nome */}
-                              <View className="mt-1 bg-white rounded-full px-3 py-1 shadow border border-slate-100">
-                                 <Text className="text-slate-800 text-[11px] font-bold">
-                                    {pin.device.name}
-                                 </Text>
-                              </View>
-                           </View>
-                        </Marker>
-                     ))}
-                  </MapView>
-                  {/* Card flutuante ao selecionar marcador */}
+                           </Marker>
+                        );
+                     })}
+                  </Map>
+
                   {selectedPin && (
                      <View className="absolute bottom-24 left-4 right-4">
                         <View className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100">
                            <View className="flex-row items-center justify-between mb-3">
                               <Text className="text-base font-semibold text-slate-900">
-                                 {selectedPin.device.name}
+                                 {selectedPin.name}
                               </Text>
+
                               <TouchableOpacity
                                  onPress={() => setSelectedPin(null)}
                                  className="p-1"
@@ -316,35 +310,45 @@ export function MapScreen() {
                                  <Text className="text-slate-400 text-lg">✕</Text>
                               </TouchableOpacity>
                            </View>
-                           <View className="flex-row gap-4">
+
+                           <View className="flex-row items-center gap-2 mb-3">
+                              <MapIcon size={14} color="#64748B" />
+                              <Text className="text-xs text-slate-500 flex-1" numberOfLines={2}>
+                                 {selectedPin.locationText !== '-' ? selectedPin.locationText : 'Endereço desconhecido'}
+                              </Text>
+                           </View>
+
+                           <View className="flex-row gap-4 border-t border-slate-100 pt-3 mt-1">
                               <View className="flex-row items-center gap-1">
                                  <Battery size={14} color="#64748B" />
                                  <Text className="text-sm text-slate-600">
-                                    {selectedPin.location.battery}%
+                                    {selectedPin.battery !== null ? `${selectedPin.battery}%` : '-'}
                                  </Text>
                               </View>
+
                               <View className="flex-row items-center gap-1">
                                  <Signal size={14} color="#64748B" />
                                  <Text className="text-sm text-slate-600">
-                                    {selectedPin.location.rssi} dBm
+                                    {selectedPin.rssi} dBm
                                  </Text>
                               </View>
+
                               <View className="flex-row items-center gap-1">
                                  <Clock size={14} color="#64748B" />
                                  <Text className="text-sm text-slate-600">
-                                    {formatDate(selectedPin.location.createdAt)}
+                                    {formatDate(selectedPin.lastUpdate)}
                                  </Text>
                               </View>
                            </View>
                         </View>
                      </View>
                   )}
-                  {/* Estado vazio */}
-                  {pins.length === 0 && (
+
+                  {devices.length === 0 && !loading && (
                      <View className="absolute top-4 left-4 right-4">
                         <View className="bg-white rounded-2xl px-4 py-3 shadow border border-slate-100 items-center">
                            <Text className="text-sm text-slate-500">
-                              Nenhum dispositivo encontrado.
+                              Nenhum dispositivo encontrado no mapa.
                            </Text>
                         </View>
                      </View>
@@ -352,8 +356,8 @@ export function MapScreen() {
                </>
             )}
          </View>
+
          <BottomNav />
       </View>
    );
 }
-

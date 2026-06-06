@@ -18,6 +18,7 @@ const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutos em milissegundos
 // Tipagens do estado local
 export interface LocalDeviceState {
    battery: number | null;      // null = "-"
+   rssi: string;        // "-" quando desconhecido
    isNear: boolean;
    locationLat: number | null;
    locationLng: number | null;
@@ -35,6 +36,7 @@ export function createLocalDevice(deviceResponse: DeviceResponse): LocalDevice {
       id: deviceResponse.id,
       name: deviceResponse.name,
       battery: null,
+      rssi: "-",
       isNear: false,
       locationLat: null,
       locationLng: null,
@@ -106,6 +108,7 @@ export async function saveDevices(devices: DeviceResponse[]) {
          id: device.id,
          name: device.name,
          battery: localCache[device.id]?.battery ?? null,
+         rssi: localCache[device.id]?.rssi ?? "-",
          isNear: localCache[device.id]?.isNear ?? false,
          locationLat: localCache[device.id]?.locationLat ?? null,
          locationLng: localCache[device.id]?.locationLng ?? null,
@@ -117,6 +120,26 @@ export async function saveDevices(devices: DeviceResponse[]) {
    // Salva o novo cache e o momento exato da sincronização
    await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
    await AsyncStorage.setItem(CACHE_SYNC_TIME_KEY, Date.now().toString());
+}
+
+export async function getAllPublicKey() {
+   const { devices, needsBackgroundSync } = await getLocalDevices();
+   var publicKeys = [];
+
+   for (var device of devices) {
+      const defaultKey = `${DEVICE_KEY}.${device.id}`;
+      var publicKey = await Keychain.getGenericPassword({
+         service: `${defaultKey}.${PUBLIC_KEY}`,
+         authenticationPrompt: {
+            title: 'Authenticate to access device keys',
+         },
+      });
+
+      if (publicKey)
+         publicKeys.push(publicKey.password);
+   }
+
+   return publicKeys;
 }
 
 /**
