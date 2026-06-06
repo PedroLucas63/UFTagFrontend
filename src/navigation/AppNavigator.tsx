@@ -20,6 +20,7 @@ import { TagInfoScreen } from "../screens/TagInfoScreen";
 import { AddTagScreen } from "../screens/AddTagScreen";
 import { ConfigureTagScreen } from "../screens/ConfigureTagScreen";
 import { MapScreen } from '../screens/MapScreen';
+import { TagDetailsScreen } from "../screens/TagDetailsScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -96,10 +97,16 @@ export function AppNavigator() {
                      options={{ animation: "none" }}
                   />
                   <Stack.Screen
+                     name="TagDetails"
+                     component={TagDetailsScreen}
+                     options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
                      name="Add"
                      component={AddTagScreen}
                      options={{ animation: "none" }}
                   />
+
                   <Stack.Screen
                      name="ConfigureTag"
                      component={ConfigureTagScreen}

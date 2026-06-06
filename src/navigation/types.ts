@@ -1,6 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { DeviceResponse } from "../api/devices";
+import { LocalDevice } from "../storage/devicesStorage";
 
 export type RootStackParamList = {
    Home: undefined;
@@ -17,7 +17,7 @@ export type RootStackParamList = {
    };
 
    TagDetails: {
-      tag: DeviceResponse;
+      tag: LocalDevice;
    };
 
    ConfigureTag: {

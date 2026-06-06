@@ -1,4 +1,5 @@
 import * as Keychain from 'react-native-keychain';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceResponse } from '../api/devices';
 import { getPassword } from './tokenStorage';
 import { deriveKey } from '../crypto/kdf';
@@ -9,12 +10,53 @@ const DEVICE_KEY = 'device';
 const PUBLIC_KEY = 'publicKey';
 const PRIVATE_KEY = 'privateKey';
 
+// Constantes do AsyncStorage
+const CACHE_DEVICES_KEY = '@devices_data';
+const CACHE_SYNC_TIME_KEY = '@devices_last_sync';
+const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutos em milissegundos
+
+// Tipagens do estado local
+export interface LocalDeviceState {
+   battery: number | null;      // null = "-"
+   isNear: boolean;
+   locationLat: number | null;
+   locationLng: number | null;
+   locationText: string;        // "-" quando desconhecido
+   lastUpdate: string | null;
+}
+
+export interface LocalDevice extends LocalDeviceState {
+   id: string;
+   name: string;
+}
+
+export function createLocalDevice(deviceResponse: DeviceResponse): LocalDevice {
+   return {
+      id: deviceResponse.id,
+      name: deviceResponse.name,
+      battery: null,
+      isNear: false,
+      locationLat: null,
+      locationLng: null,
+      locationText: "-",
+      lastUpdate: null,
+   };
+}
+
+/**
+ * Salva as chaves no Keychain e os metadados básicos no AsyncStorage.
+ */
 export async function saveDevices(devices: DeviceResponse[]) {
    const pass = await getPassword();
 
    if (!pass) {
       throw new Error('No password found');
    }
+
+   // Recupera o cache atual para não perder os dados de bateria/localização 
+   // que já estavam salvos no celular ao atualizar a lista da API
+   const existingCacheStr = await AsyncStorage.getItem(CACHE_DEVICES_KEY);
+   const localCache: Record<string, LocalDevice> = existingCacheStr ? JSON.parse(existingCacheStr) : {};
 
    for (const device of devices) {
       if (!device.keysSalt || !device.encryptedPublicKey || !device.encryptedPrivateKey) {
@@ -37,11 +79,12 @@ export async function saveDevices(devices: DeviceResponse[]) {
             privateKeyEncrypted: device.encryptedPrivateKey,
          },
          masterKey,
-      )
+      );
 
       const publicKey = Buffer.from(keyPair.publicKey).toString("base64");
       const privateKey = Buffer.from(keyPair.privateKey).toString("base64");
 
+      // CORREÇÃO MANTIDA: 'service' deve incluir o ID para não sobrescrever chaves!
       await Keychain.setGenericPassword(
          `${defaultKey}.${PUBLIC_KEY}`,
          publicKey,
@@ -49,6 +92,7 @@ export async function saveDevices(devices: DeviceResponse[]) {
             service: `device.${device.id}.publicKey`,
          }
       );
+
       await Keychain.setGenericPassword(
          `${defaultKey}.${PRIVATE_KEY}`,
          privateKey,
@@ -56,25 +100,43 @@ export async function saveDevices(devices: DeviceResponse[]) {
             service: `device.${device.id}.privateKey`,
          }
       );
-   }
-}
 
-export async function getDeviceKeys(deviceId: string): Promise<{
-   publicKey: Uint8Array;
-   privateKey: Uint8Array;
-}>{
-   if (deviceId === '123456789') {
-      return {
-         publicKey: new Uint8Array(Buffer.from("WD9YBd1BMYQS3jfRAMartYNZQe/KPp/oNOckVQnGawU=", "base64")),
-         privateKey: new Uint8Array(Buffer.from("9Ke7f/E4zLrowS6Zf3YKDhAo7lLgX3yfZ7eadrJEjmU=", "base64")),
+      // Atualiza o cache local com os metadados da API preservando o estado dinâmico (sensores)
+      localCache[device.id] = {
+         id: device.id,
+         name: device.name,
+         battery: localCache[device.id]?.battery ?? null,
+         isNear: localCache[device.id]?.isNear ?? false,
+         locationLat: localCache[device.id]?.locationLat ?? null,
+         locationLng: localCache[device.id]?.locationLng ?? null,
+         locationText: localCache[device.id]?.locationText ?? "-",
+         lastUpdate: localCache[device.id]?.lastUpdate ?? null,
       };
    }
 
+   // Salva o novo cache e o momento exato da sincronização
+   await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
+   await AsyncStorage.setItem(CACHE_SYNC_TIME_KEY, Date.now().toString());
+}
+
+/**
+ * Recupera as chaves criptográficas de um dispositivo específico.
+ */
+export async function getDeviceKeys(deviceId: string) {
+   const defaultKey = `${DEVICE_KEY}.${deviceId}`;
+
    const publicKeyEntry = await Keychain.getGenericPassword({
-      service: `device.${deviceId}.publicKey`,
+      service: `${defaultKey}.${PUBLIC_KEY}`,
+      authenticationPrompt: {
+         title: 'Authenticate to access device keys',
+      },
    });
+
    const privateKeyEntry = await Keychain.getGenericPassword({
-      service: `device.${deviceId}.privateKey`,
+      service: `${defaultKey}.${PRIVATE_KEY}`,
+      authenticationPrompt: {
+         title: 'Authenticate to access device keys',
+      },
    });
 
    if (!publicKeyEntry || !privateKeyEntry) {
@@ -82,7 +144,50 @@ export async function getDeviceKeys(deviceId: string): Promise<{
    }
 
    return {
-      publicKey: new Uint8Array(Buffer.from(publicKeyEntry.password, "base64")),
-      privateKey: new Uint8Array(Buffer.from(privateKeyEntry.password, "base64")),
+      publicKey: publicKeyEntry.password,
+      privateKey: privateKeyEntry.password,
    };
+}
+
+/**
+ * Retorna os dispositivos salvos em cache imediatamente e indica se 
+ * é necessário fazer um fetch silencioso (background) na API.
+ */
+export async function getLocalDevices(): Promise<{ devices: LocalDevice[], needsBackgroundSync: boolean }> {
+   const [cacheStr, syncTimeStr] = await Promise.all([
+      AsyncStorage.getItem(CACHE_DEVICES_KEY),
+      AsyncStorage.getItem(CACHE_SYNC_TIME_KEY)
+   ]);
+
+   const devicesDict: Record<string, LocalDevice> = cacheStr ? JSON.parse(cacheStr) : {};
+   const devices = Object.values(devicesDict);
+
+   const lastSyncTime = syncTimeStr ? parseInt(syncTimeStr, 10) : 0;
+   const timeSinceLastSync = Date.now() - lastSyncTime;
+
+   // Se passou de 10 minutos (ou se nunca sincronizou), avisa a UI para atualizar no fundo
+   const needsBackgroundSync = timeSinceLastSync > CACHE_DURATION_MS;
+
+   return { devices, needsBackgroundSync };
+}
+
+/**
+ * Atualiza apenas os dados dinâmicos de uma Tag (bateria, localização, presença).
+ * Ideal para ser chamado após processar um payload Bluetooth ou GPS.
+ */
+export async function updateDeviceState(deviceId: string, updates: Partial<LocalDeviceState>) {
+   const cacheStr = await AsyncStorage.getItem(CACHE_DEVICES_KEY);
+   if (!cacheStr) return;
+
+   const localCache: Record<string, LocalDevice> = JSON.parse(cacheStr);
+
+   if (localCache[deviceId]) {
+      localCache[deviceId] = {
+         ...localCache[deviceId],
+         ...updates,
+         lastUpdate: new Date().toISOString() // Registra automaticamente a hora da mudança
+      };
+
+      await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
+   }
 }
