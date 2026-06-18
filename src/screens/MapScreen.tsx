@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View, PermissionsAndroid, Platform } from 'react-native';
-import { Map, Camera, Marker, UserLocation } from '@maplibre/maplibre-react-native';
+import { Map, Camera, Marker, UserLocation, StyleSpecification } from '@maplibre/maplibre-react-native';
 import Geolocation, {
    GeoPosition,
    GeoError,
@@ -25,7 +25,7 @@ const DEFAULT_CENTER: Coords = {
 const DEFAULT_ZOOM = 12;
 const TARGET_ZOOM = 16;
 
-const OSM_STYLE = {
+const OSM_STYLE: StyleSpecification = {
    version: 8,
    sources: {
       osm: {
