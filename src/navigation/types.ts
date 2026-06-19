@@ -21,6 +21,7 @@ export type RootStackParamList = {
 
    ConfigureTag: {
       deviceId: string;
+      bleMacAddress: string;
    }
 
    Map: {

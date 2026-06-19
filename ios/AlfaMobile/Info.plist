@@ -55,5 +55,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>O UFTag precisa do Bluetooth para localizar e configurar a sua tag.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>O UFTag precisa se comunicar com o seu dispositivo para salvar a chave de segurança.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Necessário para descobrir UFTags próximas a você.</string>
 </dict>
 </plist>

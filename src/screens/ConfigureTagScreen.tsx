@@ -24,22 +24,30 @@ import { CreateDeviceRequest, createDevice } from "../api/devices";
 import { Buffer } from "buffer";
 import { saveDevices } from "../storage/devicesStorage";
 
+import { bleManager } from "./AddTagScreen";
+
 const STEPS = [
    "Preparando ambiente",
    "Criando chaves criptográficas",
-   "Registrando dispositivo",
+   "Sincronizando com a Tag",
+   "Registrando na nuvem",
    "Finalização",
 ];
 
+// UUIDs convertidos para o formato 128-bits exigido pelo React Native
+const UFTAG_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
+const UFTAG_CHAR_SETKEY_UUID = "0000fff2-0000-1000-8000-00805f9b34fb";
+
 type RouteParams = {
    deviceId: string;
+   bleMacAddress: string;
 };
 
 export function ConfigureTagScreen() {
    const navigation = useAppNavigation();
    const route = useRoute();
 
-   const { deviceId } = route.params as RouteParams;
+   const { deviceId, bleMacAddress } = route.params as RouteParams;
 
    const [tagName, setTagName] = useState("");
    const [nameError, setNameError] = useState(""); // Novo estado para feedback de validação
@@ -85,8 +93,30 @@ export function ConfigureTagScreen() {
          const pair = await generateKeyPair();
          const encryptedData = encryptWithMasterKey(pair, masterKey);
 
-         // Etapa 2: API
+         // Etapa 2: Sincronizando com a Tag
          setCurrentStep(2);
+
+         const publicKeyBase64 = Buffer.from(pair.publicKey).toString("base64");
+
+         try {
+            await bleManager.writeCharacteristicWithResponseForDevice(
+               bleMacAddress,
+               UFTAG_SERVICE_UUID,
+               UFTAG_CHAR_SETKEY_UUID,
+               publicKeyBase64
+            );
+         } catch (bleError: any) {
+            const isIntentionalDisconnect =
+               bleError.message?.includes("disconnected") || bleError.errorCode === 201;
+
+            if (!isIntentionalDisconnect) {
+               console.error("Erro BLE:", bleError);
+               throw new Error("Falha ao gravar a chave de segurança na Tag.");
+            }
+         }
+
+         // Etapa 3: API
+         setCurrentStep(3);
 
          const request: CreateDeviceRequest = {
             Name: name,
