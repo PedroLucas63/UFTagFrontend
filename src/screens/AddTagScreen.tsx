@@ -112,14 +112,16 @@ export function AddTagScreen() {
             return;
          }
 
-         if (device && device.manufacturerData === "//8=") {
-            setFoundDevices((prev) => {
-               if (!prev.find((d) => d.id === device.id)) {
-                  return [...prev, device];
-               }
-               return prev;
-            });
-         }
+         if (!device) return;
+         if (!device.manufacturerData) return;
+         if (!device.manufacturerData.startsWith("//8=")) return;
+
+         setFoundDevices((prev) => {
+            if (!prev.find((d) => d.id === device.id)) {
+               return [...prev, device];
+            }
+            return prev;
+         });
       });
    };
 
@@ -225,6 +227,9 @@ export function AddTagScreen() {
                            </Text>
                            <Text className="text-slate-400 text-sm mt-1">
                               MAC: {item.id}
+                           </Text>
+                           <Text className="text-slate-400 text-sm mt-1">
+                              Manufactor: {item.manufacturerData || "N/A"}
                            </Text>
                         </View>
                         <View className="bg-blue-600/20 px-3 py-1.5 rounded-full">
