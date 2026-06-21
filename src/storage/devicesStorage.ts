@@ -122,9 +122,9 @@ export async function saveDevices(devices: DeviceResponse[]) {
    await AsyncStorage.setItem(CACHE_SYNC_TIME_KEY, Date.now().toString());
 }
 
-export async function getAllPublicKey() {
+export async function getAllPublicKey(): Promise<Map<string, string>> {
    const { devices, needsBackgroundSync } = await getLocalDevices();
-   var publicKeys = [];
+   var publicKeys = new Map<string, string>();
 
    for (var device of devices) {
       const defaultKey = `${DEVICE_KEY}.${device.id}`;
@@ -136,7 +136,7 @@ export async function getAllPublicKey() {
       });
 
       if (publicKey)
-         publicKeys.push(publicKey.password);
+         publicKeys.set(device.id, publicKey.password);
    }
 
    return publicKeys;
@@ -170,6 +170,26 @@ export async function getDeviceKeys(deviceId: string) {
       publicKey: publicKeyEntry.password,
       privateKey: privateKeyEntry.password,
    };
+}
+
+export async function getDeviceByPublicKey(publicKey: string): Promise<LocalDevice | null> {
+   const { devices, needsBackgroundSync } = await getLocalDevices();
+
+   for (var device of devices) {
+      const defaultKey = `${DEVICE_KEY}.${device.id}`;
+      var currentPublicKey = await Keychain.getGenericPassword({
+         service: `${defaultKey}.${PUBLIC_KEY}`,
+         authenticationPrompt: {
+            title: 'Authenticate to access device keys',
+         },
+      });
+
+      if (currentPublicKey && currentPublicKey.password === publicKey) {
+         return device;
+      }
+   }
+
+   return null;
 }
 
 /**

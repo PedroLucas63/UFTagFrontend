@@ -98,6 +98,10 @@ export function ConfigureTagScreen() {
 
          const publicKeyBase64 = Buffer.from(pair.publicKey).toString("base64");
 
+         console.log(`[ConfigureTag] Gravando chave pública na Tag ${deviceId} via BLE...`);
+         console.log(`[ConfigureTag] Chave pública: ${pair.publicKey}`);
+         console.log(`[ConfigureTag] Chave pública (base64): ${publicKeyBase64}`);
+
          try {
             await bleManager.writeCharacteristicWithResponseForDevice(
                bleMacAddress,

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import { Bell, User } from "lucide-react-native";
+import { User } from "lucide-react-native";
 
 import { TagCard } from "../components/TagCard";
 import { BottomNav } from "../components/BottomNav";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
 import { getDevices } from "../api/devices";
-import { LocalDevice, saveDevices } from "../storage/devicesStorage";
+import { LocalDevice } from "../storage/devicesStorage";
 
 export function HomeScreen() {
    const navigation = useAppNavigation();

@@ -1,15 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View, PermissionsAndroid, Platform } from 'react-native';
 import { Map, Camera, Marker, UserLocation, StyleSpecification } from '@maplibre/maplibre-react-native';
-import Geolocation, {
-   GeoPosition,
-   GeoError,
-} from 'react-native-geolocation-service';
 import { RefreshCw, Battery, Signal, Clock, MapPin, Map as MapIcon } from 'lucide-react-native';
 import { BottomNav } from '../components/BottomNav';
 import { getLatestLocationsByKeys } from '../api/locations';
 import { getLocalDevices, LocalDevice } from '../storage/devicesStorage';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { locationService } from '../services/LocationService';
 
 type Coords = {
