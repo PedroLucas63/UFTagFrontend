@@ -1,10 +1,11 @@
-import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceResponse } from '../api/devices';
-import { getPassword } from './tokenStorage';
-import { deriveKey } from '../crypto/kdf';
 import { Buffer } from 'buffer';
+import * as Keychain from 'react-native-keychain';
+import { DeviceResponse } from '../api/devices';
+import { deriveKey } from '../crypto/kdf';
 import { decryptWithMasterKey } from '../crypto/symmetric';
+import { getPassword } from './tokenStorage';
+import { useEffect, useState } from 'react';
 
 const DEVICE_KEY = 'device';
 const PUBLIC_KEY = 'publicKey';
@@ -14,6 +15,7 @@ const PRIVATE_KEY = 'privateKey';
 const CACHE_DEVICES_KEY = '@devices_data';
 const CACHE_SYNC_TIME_KEY = '@devices_last_sync';
 const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutos em milissegundos
+const TIME_TO_PERSIST_CACHE = 15 * 1000; // 15 segundos em milissegundos
 
 // Tipagens do estado local
 export interface LocalDeviceState {
@@ -29,6 +31,23 @@ export interface LocalDeviceState {
 export interface LocalDevice extends LocalDeviceState {
    id: string;
    name: string;
+}
+
+let memoryCache: Record<string, LocalDevice> | null = {};
+let pendingPersistTimeout: ReturnType<typeof setTimeout> | null = null;
+const listeners = new Set<(devices: Record<string, LocalDevice>) => void>();
+
+function notifyListeners() {
+   listeners.forEach(listener => listener({ ...memoryCache }));
+}
+
+export function subscribeToDeviceChanges(
+   listener: (devices: Record<string, LocalDevice>) => void
+) {
+   listeners.add(listener);
+   return () => {
+      listeners.delete(listener);
+   };
 }
 
 export function createLocalDevice(deviceResponse: DeviceResponse): LocalDevice {
@@ -192,23 +211,25 @@ export async function getDeviceByPublicKey(publicKey: string): Promise<LocalDevi
    return null;
 }
 
+async function loadMemoryCache() {
+   if (Object.keys(memoryCache || {}).length === 0) {
+      const cacheStr = await AsyncStorage.getItem(CACHE_DEVICES_KEY);
+      memoryCache = cacheStr ? JSON.parse(cacheStr) : {};
+   }
+}
+
 /**
  * Retorna os dispositivos salvos em cache imediatamente e indica se 
  * é necessário fazer um fetch silencioso (background) na API.
  */
 export async function getLocalDevices(): Promise<{ devices: LocalDevice[], needsBackgroundSync: boolean }> {
-   const [cacheStr, syncTimeStr] = await Promise.all([
-      AsyncStorage.getItem(CACHE_DEVICES_KEY),
-      AsyncStorage.getItem(CACHE_SYNC_TIME_KEY)
-   ]);
+   await loadMemoryCache();
 
-   const devicesDict: Record<string, LocalDevice> = cacheStr ? JSON.parse(cacheStr) : {};
-   const devices = Object.values(devicesDict);
+   const devices = Object.values(memoryCache || {});
 
+   const syncTimeStr = await AsyncStorage.getItem(CACHE_SYNC_TIME_KEY);
    const lastSyncTime = syncTimeStr ? parseInt(syncTimeStr, 10) : 0;
    const timeSinceLastSync = Date.now() - lastSyncTime;
-
-   // Se passou de 10 minutos (ou se nunca sincronizou), avisa a UI para atualizar no fundo
    const needsBackgroundSync = timeSinceLastSync > CACHE_DURATION_MS;
 
    return { devices, needsBackgroundSync };
@@ -218,19 +239,76 @@ export async function getLocalDevices(): Promise<{ devices: LocalDevice[], needs
  * Atualiza apenas os dados dinâmicos de uma Tag (bateria, localização, presença).
  * Ideal para ser chamado após processar um payload Bluetooth ou GPS.
  */
-export async function updateDeviceState(deviceId: string, updates: Partial<LocalDeviceState>) {
-   const cacheStr = await AsyncStorage.getItem(CACHE_DEVICES_KEY);
-   if (!cacheStr) return;
+export async function updateDeviceState(
+   deviceId: string,
+   updates: Partial<LocalDeviceState>
+) {
+   await loadMemoryCache();
 
-   const localCache: Record<string, LocalDevice> = JSON.parse(cacheStr);
-
-   if (localCache[deviceId]) {
-      localCache[deviceId] = {
-         ...localCache[deviceId],
+   if (memoryCache && memoryCache[deviceId]) {
+      memoryCache[deviceId] = {
+         ...memoryCache[deviceId],
          ...updates,
-         lastUpdate: new Date().toISOString() // Registra automaticamente a hora da mudança
+         lastUpdate: new Date().toISOString(),
       };
 
-      await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
+      notifyListeners();
    }
+
+   schedulePersist();
+}
+
+function schedulePersist() {
+   if (pendingPersistTimeout) return;
+
+   pendingPersistTimeout = setTimeout(async () => {
+      try {
+         await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(memoryCache));
+         console.log('[Storage] Cache gravado em lote no AsyncStorage com sucesso.');
+      } catch (error) {
+         console.error('[Storage] Erro ao gravar cache no AsyncStorage:', error);
+      } finally {
+         pendingPersistTimeout = null;
+      }
+   }, TIME_TO_PERSIST_CACHE);
+}
+
+export function useLiveDevice(deviceId: string): LocalDevice | null {
+   const [device, setDevice] = useState<LocalDevice | null>(null);
+
+   useEffect(() => {
+      getLocalDevices().then(() => {
+         if (memoryCache && memoryCache[deviceId]) {
+            setDevice(memoryCache[deviceId]);
+         }
+      });
+
+      const unsubscribe = subscribeToDeviceChanges((updatedCache) => {
+         if (updatedCache[deviceId]) {
+            setDevice(updatedCache[deviceId]);
+         }
+      });
+
+      return unsubscribe;
+   }, [deviceId]);
+
+   return device;
+}
+
+export function useLiveDevices(): LocalDevice[] {
+   const [devices, setDevices] = useState<LocalDevice[]>([]);
+
+   useEffect(() => {
+      getLocalDevices().then(() => {
+         setDevices(Object.values(memoryCache || {}));
+      });
+
+      const unsubscribe = subscribeToDeviceChanges((updatedCache) => {
+         setDevices(Object.values(updatedCache));
+      });
+
+      return unsubscribe;
+   }, []);
+
+   return devices;
 }

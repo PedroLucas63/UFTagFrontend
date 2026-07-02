@@ -21,6 +21,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useLiveDevice } from '../storage/devicesStorage';
 
 const buzzerSteps = [
    { icon: Volume2, text: 'Conectando...', color: 'text-slate-400', iconColor: '#94a3b8' },
@@ -35,7 +36,8 @@ export function TagDetailsScreen() {
    const navigation = useNavigation<TagDetailsNavigationProp>();
    const route = useRoute<TagDetailsRouteProp>();
 
-   const tag = route.params.tag;
+   const initialTag = route.params.tag;
+   const tag = useLiveDevice(initialTag.id) || initialTag;
 
    const [isEditing, setIsEditing] = useState(false);
    const [tagName, setTagName] = useState(tag.name);

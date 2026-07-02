@@ -6,59 +6,12 @@ import { TagCard } from "../components/TagCard";
 import { BottomNav } from "../components/BottomNav";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
-import { getDevices } from "../api/devices";
-import { LocalDevice } from "../storage/devicesStorage";
+import { useLiveDevices } from "../storage/devicesStorage";
 
 export function HomeScreen() {
    const navigation = useAppNavigation();
 
-   const [tags, setTags] = useState<LocalDevice[]>([]);
-   const [loading, setLoading] = useState(true);
-   const [tagsError, setTagsError] = useState<string | null>(null);
-
-   useEffect(() => {
-      let isMounted = true;
-
-      async function loadDevices() {
-         try {
-            const result = await getDevices();
-
-            if (!isMounted) {
-               return;
-            }
-
-            if (result.ok) {
-               setTags(result.data);
-               setTagsError(null);
-               return;
-            }
-
-            setTags([]);
-            setTagsError(result.error);
-         } catch (error) {
-            if (!isMounted) {
-               return;
-            }
-
-            setTags([]);
-            setTagsError(
-               error instanceof Error
-                  ? error.message
-                  : "Falha ao carregar tags"
-            );
-         } finally {
-            if (isMounted) {
-               setLoading(false);
-            }
-         }
-      }
-
-      loadDevices();
-
-      return () => {
-         isMounted = false;
-      };
-   }, []);
+   const tags = useLiveDevices();
 
    const handleTagClick = (tag: (typeof tags)[0]) => {
       navigation.navigate("TagDetails", { tag });
@@ -93,17 +46,7 @@ export function HomeScreen() {
             </Text>
 
             <View className="gap-3">
-               {loading ? (
-                  <Loading
-                     variant="full"
-                     message="Buscando suas tags..."
-                     containerClassName="py-10"
-                  />
-               ) : tagsError ? (
-                  <Text className="text-sm text-red-600">
-                     {tagsError}
-                  </Text>
-               ) : tags.length === 0 ? (
+               {tags.length === 0 ? (
                   <View className="items-center bg-white rounded-3xl border border-slate-200 px-6 py-8 shadow">
                      <Text className="text-base text-slate-700 font-semibold mb-2">
                         Nenhuma tag registrada ainda

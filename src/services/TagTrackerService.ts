@@ -1,12 +1,11 @@
 import { locationService } from './LocationService';
-import * as Keychain from 'react-native-keychain';
 import { Buffer } from 'buffer';
 import { bleManager } from '../screens/AddTagScreen';
-import { getAllPublicKey, getLocalDevices, updateDeviceState } from '../storage/devicesStorage';
+import { getAllPublicKey, updateDeviceState } from '../storage/devicesStorage';
 
 const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
-const UPDATE_THROTTLE_MS = 10000;
+const UPDATE_THROTTLE_MS = 500; // 500ms
 
 class TagTrackerService {
    private isScanning = false;
@@ -79,7 +78,7 @@ class TagTrackerService {
       const now = Date.now();
       const lastUpdate = this.lastUpdateMap.get(cacheKey) || 0;
 
-      // Se faz menos de 10 segundos que atualizamos essa tag, ignoramos este pacote
+      // Se faz menos de 500 segundos que atualizamos essa tag, ignoramos este pacote
       if (now - lastUpdate < UPDATE_THROTTLE_MS) return;
       this.lastUpdateMap.set(cacheKey, now);
 
