@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
    View,
    Text,
@@ -6,7 +6,8 @@ import {
    TextInput,
    ScrollView,
    Modal,
-   Alert
+   Alert,
+   Vibration
 } from 'react-native';
 import {
    ArrowLeft,
@@ -44,6 +45,79 @@ export function TagDetailsScreen() {
    const [showBuzzerModal, setShowBuzzerModal] = useState(false);
    const [buzzerStep, setBuzzerStep] = useState(0);
    const [showRadar, setShowRadar] = useState(false);
+   const [beepActive, setBeepActive] = useState(false);
+
+   // Parse do RSSI do dispositivo
+   const rssiVal = tag.rssi && tag.rssi !== '-' ? parseInt(tag.rssi, 10) : null;
+
+   // Lógica de feedback físico (vibração) e visual em sintonia com a proximidade
+   useEffect(() => {
+      if (!showRadar || rssiVal === null) {
+         setBeepActive(false);
+         return;
+      }
+
+      // Proximidade determina o intervalo do aviso físico/visual:
+      // -50 dBm (muito perto) -> 200ms
+      // -100 dBm (limite/longe) -> 1600ms
+      const minInterval = 200;
+      const maxInterval = 1600;
+      const numericRssi = Math.max(-100, Math.min(-50, rssiVal));
+      const ratio = (-50 - numericRssi) / 50; // 0 (perto) até 1 (longe)
+      const intervalMs = minInterval + ratio * (maxInterval - minInterval);
+
+      const intervalId = setInterval(() => {
+         Vibration.vibrate(40);
+         setBeepActive(true);
+         setTimeout(() => setBeepActive(false), 80);
+      }, intervalMs);
+
+      return () => {
+         clearInterval(intervalId);
+      };
+   }, [showRadar, rssiVal]);
+
+   // Cálculo da posição no Radar
+   const minRssi = -100;
+   const maxRssi = -50;
+   const numericRssiForRadar = rssiVal !== null ? Math.max(minRssi, Math.min(maxRssi, rssiVal)) : -100;
+   const distanceRatio = (maxRssi - numericRssiForRadar) / (maxRssi - minRssi);
+
+   const angle = Math.PI / 4; // 45 graus
+   const maxRadius = 120; // Raio máximo utilizável no container w-72 (288px)
+   const radius = distanceRatio * maxRadius;
+
+   const xOffset = radius * Math.cos(angle);
+   const yOffset = radius * Math.sin(angle);
+
+   // Posições X e Y centralizadas no container de 288x288 pixels (metade é 144)
+   // Ajustamos 12px que é a metade do tamanho da bolinha (w-6 = 24px)
+   const dotLeft = 144 + xOffset - 12;
+   const dotTop = 144 - yOffset - 12;
+
+   // Status dinâmico
+   let signalStatus = 'Buscando Sinal...';
+   let signalColor = 'text-slate-500';
+   let distanceText = 'Aguardando atualização de sinal';
+
+   if (rssiVal !== null) {
+      const distance = Math.pow(10, ((-60 - rssiVal) / 20));
+      distanceText = `~${distance.toFixed(1)}m`;
+
+      if (rssiVal >= -60) {
+         signalStatus = 'Muito Próximo (Sinal Forte)';
+         signalColor = 'text-green-500';
+      } else if (rssiVal >= -75) {
+         signalStatus = 'Próximo (Sinal Médio)';
+         signalColor = 'text-yellow-500';
+      } else if (rssiVal >= -90) {
+         signalStatus = 'Longe (Sinal Fraco)';
+         signalColor = 'text-orange-500';
+      } else {
+         signalStatus = 'Muito Longe (Sinal Muito Fraco)';
+         signalColor = 'text-red-500';
+      }
+   }
 
    const handleSaveName = () => {
       setIsEditing(false);
@@ -241,11 +315,11 @@ export function TagDetailsScreen() {
 
                   {/* Simulação do Radar na Tela Nativa */}
                   <View className="relative w-72 h-72 items-center justify-center">
-                     {/* Círculos */}
-                     <View className="absolute inset-0 border-2 border-blue-600/30 rounded-full" />
-                     <View className="absolute w-56 h-56 border-2 border-blue-600/30 rounded-full" />
-                     <View className="absolute w-40 h-40 border-2 border-blue-600/30 rounded-full" />
-                     <View className="absolute w-24 h-24 border-2 border-blue-600/30 rounded-full" />
+                     {/* Círculos com efeito de pulso se o beep visual estiver ativo */}
+                     <View className={`absolute inset-0 border-2 rounded-full ${beepActive ? 'border-blue-500/60 bg-blue-500/5' : 'border-blue-600/30'}`} />
+                     <View className={`absolute w-56 h-56 border-2 rounded-full ${beepActive ? 'border-blue-500/60' : 'border-blue-600/30'}`} />
+                     <View className={`absolute w-40 h-40 border-2 rounded-full ${beepActive ? 'border-blue-500/60' : 'border-blue-600/30'}`} />
+                     <View className={`absolute w-24 h-24 border-2 rounded-full ${beepActive ? 'border-blue-500/60' : 'border-blue-600/30'}`} />
 
                      {/* Linhas cruzadas */}
                      <View className="absolute w-full h-0.5 bg-blue-600/30" />
@@ -254,20 +328,57 @@ export function TagDetailsScreen() {
                      {/* Centro (Você) */}
                      <View className="w-4 h-4 bg-white rounded-full shadow-lg" />
 
-                     {/* Tag Detectada */}
-                     <View className="absolute" style={{ top: '35%', left: '60%' }}>
-                        <View className="w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg" />
-                        <View className="absolute -top-8 -left-6 bg-green-500 px-2 py-1 rounded-md">
-                           <Text className="text-white text-xs font-bold">{tagName}</Text>
+                     {/* Tag Detectada (Posicionada dinamicamente com base no RSSI real) */}
+                     <View
+                        className="absolute"
+                        style={{
+                           left: dotLeft,
+                           top: dotTop,
+                           opacity: rssiVal !== null ? 1 : 0.4
+                        }}
+                     >
+                        <View className={`w-6 h-6 rounded-full border-2 border-white shadow-lg justify-center items-center ${rssiVal !== null ? 'bg-green-500' : 'bg-slate-500'}`}>
+                           {beepActive && (
+                              <View 
+                                 className="absolute border border-green-400 rounded-full" 
+                                 style={{ width: 40, height: 40, opacity: 0.5 }} 
+                              />
+                           )}
+                        </View>
+                        <View 
+                           style={{ 
+                              position: 'absolute', 
+                              top: -32, 
+                              left: -63, 
+                              width: 150, 
+                              alignItems: 'center' 
+                           }}
+                        >
+                           <View className="bg-green-600 px-2.5 py-1 rounded-md shadow-md max-w-full">
+                              <Text 
+                                 className="text-white text-xs font-bold" 
+                                 numberOfLines={1} 
+                                 ellipsizeMode="tail"
+                              >
+                                 {tagName}
+                              </Text>
+                           </View>
                         </View>
                      </View>
                   </View>
 
                   {/* Status do Radar */}
                   <View className="mt-16 items-center">
-                     <Text className="text-green-500 font-bold text-lg mb-1">Sinal Forte</Text>
-                     <Text className="text-slate-400 text-sm">RSSI: -45 dBm</Text>
-                     <Text className="text-slate-400 text-sm">Distância estimada: ~2m</Text>
+                     <View className="flex-row items-center gap-2 mb-2">
+                        {rssiVal !== null && (
+                           <View className={`p-1.5 rounded-full ${beepActive ? 'bg-green-500/20' : 'bg-slate-800'}`}>
+                              <Volume2 size={18} color={beepActive ? '#22c55e' : '#64748b'} />
+                           </View>
+                        )}
+                        <Text className={`font-bold text-lg ${signalColor}`}>{signalStatus}</Text>
+                     </View>
+                     <Text className="text-slate-400 text-sm">RSSI: {rssiVal !== null ? `${rssiVal} dBm` : 'Buscando...'}</Text>
+                     <Text className="text-slate-400 text-sm">Distância estimada: {distanceText}</Text>
                   </View>
                </View>
             </View>
