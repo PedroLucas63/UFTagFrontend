@@ -2,7 +2,7 @@ import { locationService } from './LocationService';
 import { Buffer } from 'buffer';
 import { bleManager } from '../screens/AddTagScreen';
 import { getAllPublicKey, updateDeviceState } from '../storage/devicesStorage';
-import { LocationReportRequest } from '../api/locations';
+import { LocationReportRequest, reportLocation } from '../api/locations';
 import { Device } from 'react-native-ble-plx';
 import { encryptWithPublicKey } from '../crypto/asymmetric';
 
@@ -17,6 +17,7 @@ class TagTrackerService {
    private knownKeysCache = new Map<string, string>();
    private reportMap = new Map<string, LocationReportRequest>(); // PublicKey: Report
    private locationEncrypted: string | null = null;
+   private reportInterval: ReturnType<typeof setInterval> | null = null;
 
    /**
     * Inicializa o serviço, carrega as chaves para a RAM e começa o scan
@@ -28,6 +29,26 @@ class TagTrackerService {
 
       this.isScanning = true;
       console.log('[TagTracker] Iniciando scan global em segundo plano...');
+
+      this.reportInterval = setInterval(async () => {
+         if (this.reportMap.size > 0) {
+            console.log(`[TagTracker] Enviando ${this.reportMap.size} relatórios de localização...`);
+            const entries = Array.from(this.reportMap.entries());
+
+            await Promise.all(
+               entries.map(async ([key, report]) => {
+                  try {
+                     await reportLocation(report);
+                     this.reportMap.delete(key);
+                  } catch (error) {
+                     console.error(`[TagTracker] Erro ao reportar localização para a chave ${key}:`, error);
+                  }
+               })
+            );
+
+            this.locationEncrypted = null;
+         }
+      }, REPORT_THROTTLE_MS);
 
       bleManager.startDeviceScan(null, { allowDuplicates: true }, async (error, device) => {
          if (error) {
@@ -159,6 +180,11 @@ class TagTrackerService {
          bleManager.stopDeviceScan();
          this.isScanning = false;
          console.log('[TagTracker] Scan global parado.');
+
+         if (this.reportInterval) {
+            clearInterval(this.reportInterval);
+            this.reportInterval = null;
+         }
       }
    }
 }
