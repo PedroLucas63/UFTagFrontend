@@ -31,7 +31,7 @@ const alertSteps = [
 ];
 
 import { formatRelativeTime } from '../utils/dateUtils';
-import { renameTagAndSyncBle, triggerTagAlert } from '../services/TagRenameService';
+import { renameTagAndSyncBle, triggerTagAlert } from '../services/TagService';
 
 type TagDetailsRouteProp = RouteProp<RootStackParamList, 'TagDetails'>;
 type TagDetailsNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TagDetails'>;
