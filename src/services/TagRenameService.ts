@@ -6,6 +6,7 @@ import { Buffer } from "buffer";
 const UFTAG_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
 const UFTAG_CHAR_ID_UUID  = "0000fff3-0000-1000-8000-00805f9b34fb";
 const UFTAG_CHAR_NAME_UUID = "0000fff4-0000-1000-8000-00805f9b34fb";
+const UFTAG_CHAR_CMD_UUID = "0000fff1-0000-1000-8000-00805f9b34fb";
 
 const decodeBase64Text = (base64: string) => {
    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -79,7 +80,7 @@ async function findTagBleMac(targetDeviceId: string): Promise<string> {
                      resolve(device.id);
                   } else {
                      console.log(`[TagRename] ID lido (${decodedId}) não corresponde. Desconectando...`);
-                     await connected.disconnect();
+                     await connected.cancelConnection();
                      // Retoma o scan para buscar outras tags próximas
                      startScan();
                   }
@@ -146,4 +147,51 @@ export async function renameTagAndSyncBle(deviceId: string, newName: string): Pr
    await updateDeviceState(deviceId, {
       locationText: "Nome alterado e sincronizado"
    });
+}
+
+/**
+ * Envia o comando de Alerta Máximo (CMD_ALERT) para o nRF52840 via BLE.
+ * Esse comando aciona o LED piscante na tag física.
+ */
+export async function triggerTagAlert(
+   deviceId: string,
+   durationMs: number = 5000,
+   onConnected?: () => void
+): Promise<void> {
+   console.log(`[TagAlert] Buscando tag física ${deviceId} no alcance BLE para acionar alerta...`);
+   const targetMacAddress = await findTagBleMac(deviceId);
+
+   if (onConnected) {
+      onConnected();
+   }
+
+   // Prepara o payload de 4 bytes para CMD_ALERT (0x04)
+   const action = 0x04;
+   const hiMs = (durationMs >> 8) & 0xFF;
+   const loMs = durationMs & 0xFF;
+   const payload = Buffer.from([action, hiMs, loMs, 0x00]);
+   const payloadBase64 = payload.toString("base64");
+
+   console.log(`[TagAlert] Enviando comando de alerta (${durationMs}ms) via FFF1...`);
+   
+   try {
+      await bleManager.writeCharacteristicWithResponseForDevice(
+         targetMacAddress,
+         UFTAG_SERVICE_UUID,
+         UFTAG_CHAR_CMD_UUID,
+         payloadBase64
+      );
+      console.log(`[TagAlert] Alerta acionado com sucesso.`);
+   } catch (err: any) {
+      console.error(`[TagAlert] Erro ao enviar comando de alerta:`, err);
+      throw new Error(err.message || "Falha ao enviar comando de alerta para a Tag.");
+   } finally {
+      // Sempre desconecta do dispositivo após enviar o comando
+      try {
+         await bleManager.cancelDeviceConnection(targetMacAddress);
+         console.log(`[TagAlert] Desconectado da tag após comando.`);
+      } catch (e) {
+         console.warn("[TagAlert] Erro ao desconectar:", e);
+      }
+   }
 }

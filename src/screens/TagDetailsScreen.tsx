@@ -24,14 +24,14 @@ import { RootStackParamList } from '../navigation/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useLiveDevice } from '../storage/devicesStorage';
 
-const buzzerSteps = [
+const alertSteps = [
    { icon: Volume2, text: 'Conectando...', color: 'text-slate-400', iconColor: '#94a3b8' },
    { icon: Volume2, text: 'Conexão estabelecida', color: 'text-blue-600', iconColor: '#2563eb' },
-   { icon: Volume2, text: 'Buzzer acionado!', color: 'text-green-500', iconColor: '#22c55e' },
+   { icon: Volume2, text: 'Alerta acionado!', color: 'text-green-500', iconColor: '#22c55e' },
 ];
 
 import { formatRelativeTime } from '../utils/dateUtils';
-import { renameTagAndSyncBle } from '../services/TagRenameService';
+import { renameTagAndSyncBle, triggerTagAlert } from '../services/TagRenameService';
 
 type TagDetailsRouteProp = RouteProp<RootStackParamList, 'TagDetails'>;
 type TagDetailsNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TagDetails'>;
@@ -143,16 +143,23 @@ export function TagDetailsScreen() {
        }
     };
 
-   const handleBuzzer = () => {
+   const handleBuzzer = async () => {
       setShowBuzzerModal(true);
       setBuzzerStep(0);
 
-      setTimeout(() => setBuzzerStep(1), 600);
-      setTimeout(() => setBuzzerStep(2), 1200);
-      setTimeout(() => {
-         setBuzzerStep(3);
-         setTimeout(() => setShowBuzzerModal(false), 800);
-      }, 1800);
+      try {
+         await triggerTagAlert(tag.id, 5000, () => {
+            setBuzzerStep(1);
+         });
+         setBuzzerStep(2);
+         setTimeout(() => {
+            setShowBuzzerModal(false);
+         }, 2000);
+      } catch (err: any) {
+         console.error("[TagDetails] Falha ao acionar alerta:", err);
+         Alert.alert("Falha de Comunicação", err.message || "Não foi possível acionar o alerta na Tag.");
+         setShowBuzzerModal(false);
+      }
    };
 
    // Cores dinâmicas da bateria
@@ -270,7 +277,7 @@ export function TagDetailsScreen() {
                      className="w-full flex-row items-center justify-center gap-2 bg-blue-600 py-4 rounded-2xl mb-3"
                   >
                      <Volume2 size={20} color="white" />
-                     <Text className="text-white font-semibold text-base">Acionar Buzzer</Text>
+                     <Text className="text-white font-semibold text-base">Acionar Alerta</Text>
                   </TouchableOpacity>
                )}
 
@@ -292,33 +299,20 @@ export function TagDetailsScreen() {
             </View>
          </ScrollView>
 
-         {/* Modal do Buzzer */}
+         {/* Modal de Alerta */}
          <Modal transparent visible={showBuzzerModal} animationType="fade">
             <View className="flex-1 bg-black/50 justify-center items-center p-6">
                <View className="bg-white rounded-3xl p-8 w-full max-w-sm items-center">
-                  {buzzerStep < 3 ? (
-                     <>
-                        <View className={`w-20 h-20 rounded-full items-center justify-center mb-4 ${buzzerStep === 0 ? 'bg-slate-100' : buzzerStep === 1 ? 'bg-blue-100' : 'bg-green-100'
-                           }`}>
-                           {React.createElement(buzzerSteps[buzzerStep].icon, {
-                              size: 40,
-                              color: buzzerSteps[buzzerStep].iconColor
-                           })}
-                        </View>
-                        <Text className={`text-lg font-semibold ${buzzerSteps[buzzerStep].color}`}>
-                           {buzzerSteps[buzzerStep].text}
-                        </Text>
-                     </>
-                  ) : (
-                     <>
-                        <View className="w-20 h-20 rounded-full bg-green-500 items-center justify-center mb-4">
-                           <Volume2 size={40} color="white" />
-                        </View>
-                        <Text className="text-lg font-semibold text-green-500">
-                           Buzzer acionado!
-                        </Text>
-                     </>
-                  )}
+                  <View className={`w-20 h-20 rounded-full items-center justify-center mb-4 ${buzzerStep === 0 ? 'bg-slate-100' : buzzerStep === 1 ? 'bg-blue-100' : 'bg-green-100'
+                     }`}>
+                     {React.createElement(alertSteps[buzzerStep].icon, {
+                        size: 40,
+                        color: alertSteps[buzzerStep].iconColor
+                     })}
+                  </View>
+                  <Text className={`text-lg font-semibold ${alertSteps[buzzerStep].color}`}>
+                     {alertSteps[buzzerStep].text}
+                  </Text>
                </View>
             </View>
          </Modal>
