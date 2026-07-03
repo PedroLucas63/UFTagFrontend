@@ -2,16 +2,21 @@ import { locationService } from './LocationService';
 import { Buffer } from 'buffer';
 import { bleManager } from '../screens/AddTagScreen';
 import { getAllPublicKey, updateDeviceState } from '../storage/devicesStorage';
+import { LocationReportRequest } from '../api/locations';
+import { Device } from 'react-native-ble-plx';
+import { encryptWithPublicKey } from '../crypto/asymmetric';
 
 const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
 const UPDATE_THROTTLE_MS = 500; // 500ms
+const REPORT_THROTTLE_MS = 30000; // 30s
 
 class TagTrackerService {
    private isScanning = false;
    private lastUpdateMap = new Map<string, number>();
-
    private knownKeysCache = new Map<string, string>();
+   private reportMap = new Map<string, LocationReportRequest>(); // PublicKey: Report
+   private locationEncrypted: string | null = null;
 
    /**
     * Inicializa o serviço, carrega as chaves para a RAM e começa o scan
@@ -51,6 +56,17 @@ class TagTrackerService {
                fullKey = fullKeyBuffer.toString('base64');
             }
 
+            let report: LocationReportRequest;
+            if (this.reportMap.has(partialKeyHex)) {
+               report = this.reportMap.get(partialKeyHex)!;
+            } else {
+               if (!fullKey) {
+                  console.log(`[TagTracker] Tag detectada sem chave completa. Ignorando...`);
+                  return;
+               }
+               report = await this.createReport(fullKey, device);
+            }
+
             const deviceId = this.knownKeysCache.get(partialKeyHex);
 
             console.log(`[TagTracker] Dispositivo detectado: ${deviceId}`);
@@ -59,16 +75,41 @@ class TagTrackerService {
             if (deviceId) {
                console.log(`[TagTracker] Minha Tag detectada: ${deviceId} (RSSI: ${device.rssi})`);
                this.processFoundTag(deviceId, partialKeyHex, device.rssi, isLost);
-            }
-            else if (fullKey) {
+               this.reportMap.set(partialKeyHex, report);
+            } else if (fullKey) {
                console.log(`[REDE] Tag desconhecida detectada! Chave completa: ${fullKey}`);
 
                if (isLost) {
                   console.log(`[REDE] Esta Tag está reportada como PERDIDA pelo dono!`);
+                  this.reportMap.set(partialKeyHex, report);
                }
             }
          }
       });
+   }
+
+   private async createReport(key: string, device: Device): Promise<LocationReportRequest> {
+      const now = Date.now();
+      const rssi = device.rssi || 0;
+      const battery = device.txPowerLevel !== null ? Math.round(device.txPowerLevel * 100) : 0;
+
+      let locationEncrypted: string;
+      if (this.locationEncrypted) {
+         locationEncrypted = this.locationEncrypted;
+      } else {
+         const location = locationService.getLastKnownPosition();
+         const locationText = `${location?.latitude || 0};${location?.longitude || 0}`;
+         locationEncrypted = await encryptWithPublicKey(locationText, Buffer.from(key, 'base64'));
+         this.locationEncrypted = locationEncrypted;
+      }
+
+      return {
+         Key: key,
+         LocationEncrypted: locationEncrypted,
+         Rssi: rssi,
+         Battery: battery,
+         Timestamp: now.toString(),
+      };
    }
 
    /**

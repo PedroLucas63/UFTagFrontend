@@ -114,7 +114,7 @@ export function AddTagScreen() {
 
          if (!device) return;
          if (!device.manufacturerData) return;
-         if (!device.manufacturerData.startsWith("//8=")) return;
+         if (!device.manufacturerData.startsWith("//8")) return;
 
          setFoundDevices((prev) => {
             if (!prev.find((d) => d.id === device.id)) {

@@ -112,3 +112,20 @@ export async function getLatestLocationsByKeys(): Promise<ApiResult<LocationResp
 
     return result;
 }
+
+export type LocationReportRequest = {
+    Key: string;
+    LocationEncrypted: string;
+    Rssi: number;
+    Battery: number;
+    Timestamp: string;
+}
+
+export async function reportLocation(locationRequest: LocationReportRequest) {
+    await request<void>(
+        apiClient.post("/locations/report", locationRequest),
+        {
+            fallbackError: "Falha ao reportar localização",
+        }
+    );
+}
