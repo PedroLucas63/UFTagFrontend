@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Battery, MapPin, Clock } from "lucide-react-native";
+import { formatRelativeTime } from "../utils/dateUtils";
 
 interface TagCardProps {
    name: string;
@@ -79,7 +80,7 @@ export function TagCard({
             <View className="flex-row items-center gap-2">
                <Clock size={16} color="#64748B" />
                <Text className="text-sm text-slate-500">
-                  Última atualização: {lastUpdate}
+                  Última atualização: {formatRelativeTime(lastUpdate)}
                </Text>
             </View>
          </View>

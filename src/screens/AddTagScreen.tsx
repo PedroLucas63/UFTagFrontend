@@ -220,17 +220,13 @@ export function AddTagScreen() {
                         <View className="w-12 h-12 rounded-full bg-slate-700 items-center justify-center mr-4">
                            <Tag size={24} color="#60A5FA" />
                         </View>
-                        <View className="flex-1">
+
+                        <View className="flex-1 justify-center">
                            <Text className="text-white font-semibold text-lg">
                               {item.name || "UFTag Desconhecida"}
                            </Text>
-                           <Text className="text-slate-400 text-sm mt-1">
-                              MAC: {item.id}
-                           </Text>
-                           <Text className="text-slate-400 text-sm mt-1">
-                              Manufactor: {item.manufacturerData || "N/A"}
-                           </Text>
                         </View>
+
                         <View className="bg-blue-600/20 px-3 py-1.5 rounded-full">
                            <Text className="text-blue-400 text-xs font-medium">
                               Conectar

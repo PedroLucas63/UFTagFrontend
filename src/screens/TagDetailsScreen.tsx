@@ -30,6 +30,9 @@ const buzzerSteps = [
    { icon: Volume2, text: 'Buzzer acionado!', color: 'text-green-500', iconColor: '#22c55e' },
 ];
 
+import { formatRelativeTime } from '../utils/dateUtils';
+import { renameTagAndSyncBle } from '../services/TagRenameService';
+
 type TagDetailsRouteProp = RouteProp<RootStackParamList, 'TagDetails'>;
 type TagDetailsNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TagDetails'>;
 
@@ -41,6 +44,7 @@ export function TagDetailsScreen() {
    const tag = useLiveDevice(initialTag.id) || initialTag;
 
    const [isEditing, setIsEditing] = useState(false);
+   const [isSavingName, setIsSavingName] = useState(false);
    const [tagName, setTagName] = useState(tag.name);
    const [showBuzzerModal, setShowBuzzerModal] = useState(false);
    const [buzzerStep, setBuzzerStep] = useState(0);
@@ -119,10 +123,25 @@ export function TagDetailsScreen() {
       }
    }
 
-   const handleSaveName = () => {
-      setIsEditing(false);
-      Alert.alert('Sucesso', 'Nome alterado com sucesso!');
-   };
+    const handleSaveName = async () => {
+       const name = tagName.trim();
+       if (name.length < 2 || name.length > 12) {
+          Alert.alert("Erro", "O nome deve conter entre 2 e 12 caracteres.");
+          return;
+       }
+
+       setIsSavingName(true);
+       try {
+          await renameTagAndSyncBle(tag.id, name);
+          setIsEditing(false);
+          Alert.alert("Sucesso", "Nome alterado e sincronizado com a Tag!");
+       } catch (err: any) {
+          console.error("[TagDetails] Falha ao renomear dispositivo:", err);
+          Alert.alert("Erro de Sincronização", err.message || "Não foi possível sincronizar o novo nome com a Tag.");
+       } finally {
+          setIsSavingName(false);
+       }
+    };
 
    const handleBuzzer = () => {
       setShowBuzzerModal(true);
@@ -165,19 +184,24 @@ export function TagDetailsScreen() {
             <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
                <View className="mb-6">
                   {isEditing ? (
-                     <View className="flex-row items-center gap-2">
-                        <TextInput
-                           value={tagName}
-                           onChangeText={setTagName}
-                           className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-slate-900"
-                        />
-                        <TouchableOpacity
-                           onPress={handleSaveName}
-                           className="bg-blue-600 px-5 py-3 rounded-xl"
-                        >
-                           <Text className="text-white font-semibold">Salvar</Text>
-                        </TouchableOpacity>
-                     </View>
+                      <View className="flex-row items-center gap-2">
+                         <TextInput
+                            value={tagName}
+                            onChangeText={setTagName}
+                            editable={!isSavingName}
+                            maxLength={12}
+                            className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-slate-900"
+                         />
+                         <TouchableOpacity
+                            onPress={handleSaveName}
+                            disabled={isSavingName}
+                            className={`px-5 py-3 rounded-xl ${isSavingName ? 'bg-slate-300' : 'bg-blue-600'}`}
+                         >
+                            <Text className="text-white font-semibold">
+                               {isSavingName ? 'Salvando...' : 'Salvar'}
+                            </Text>
+                         </TouchableOpacity>
+                      </View>
                   ) : (
                      <View className="flex-row items-center justify-between">
                         <Text className="text-2xl font-bold text-slate-900">{tagName}</Text>
@@ -232,7 +256,7 @@ export function TagDetailsScreen() {
                      <Clock size={24} color="#475569" />
                      <View>
                         <Text className="text-xs text-gray-500">Última atualização</Text>
-                        <Text className="font-semibold text-slate-900">Hoje às {tag.lastUpdate}</Text>
+                        <Text className="font-semibold text-slate-900">{formatRelativeTime(tag.lastUpdate)}</Text>
                      </View>
                   </View>
                </View>

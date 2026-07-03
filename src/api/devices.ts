@@ -87,3 +87,15 @@ export async function createDevice(
       }
    );
 }
+
+export async function updateDeviceName(
+   id: string,
+   name: string
+): Promise<ApiResult<DeviceResponse>> {
+   return await request<DeviceResponse>(
+      apiClient.put(`/devices/${encodeURIComponent(id)}/name`, { Name: name }),
+      {
+         fallbackError: "Falha ao renomear dispositivo no servidor",
+      }
+   );
+}

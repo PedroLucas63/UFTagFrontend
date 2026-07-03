@@ -20,7 +20,7 @@ import { deriveKey, generateSalt } from "../crypto/kdf";
 import { getPassword } from "../storage/tokenStorage";
 import { generateKeyPair } from "../crypto/keypair";
 import { encryptWithMasterKey } from "../crypto/symmetric";
-import { CreateDeviceRequest, createDevice } from "../api/devices";
+import { CreateDeviceRequest, createDevice, getPublicDevice } from "../api/devices";
 import { Buffer } from "buffer";
 import { saveDevices } from "../storage/devicesStorage";
 
@@ -60,8 +60,8 @@ export function ConfigureTagScreen() {
       setTagName(text);
       if (text.length > 0 && text.trim().length < 2) {
          setNameError("O nome deve ter pelo menos 2 caracteres.");
-      } else if (text.length > 100) {
-         setNameError("O nome deve ter no máximo 100 caracteres.");
+      } else if (text.length > 12) {
+         setNameError("O nome deve ter no máximo 12 caracteres.");
       } else {
          setNameError("");
       }
@@ -69,7 +69,7 @@ export function ConfigureTagScreen() {
 
    const handleConfigure = async () => {
       const name = tagName.trim();
-      if (name.length < 2 || name.length > 100) return;
+      if (name.length < 2 || name.length > 12) return;
 
       setConfiguring(true);
       setErrorMsg(null);
@@ -78,6 +78,15 @@ export function ConfigureTagScreen() {
       try {
          // Etapa 0: Preparando
          await new Promise<void>((resolve) => setTimeout(resolve, 600));
+
+         // Verifica se a Tag já existe no servidor antes de prosseguir
+         console.log(`[ConfigureTag] Verificando se tag ${deviceId} já existe na API...`);
+         const checkExist = await getPublicDevice(deviceId);
+         if (checkExist.ok) {
+            throw new Error("Esta tag já está cadastrada no sistema.");
+         } else if (checkExist.status !== 404) {
+            throw new Error(checkExist.error || "Não foi possível verificar a tag com o servidor.");
+         }
 
          // Etapa 1: Chaves Criptográficas
          setCurrentStep(1);
@@ -256,7 +265,7 @@ export function ConfigureTagScreen() {
    }
 
    // Validação para desabilitar o botão
-   const isButtonDisabled = !tagName.trim() || tagName.trim().length < 2 || tagName.length > 100;
+   const isButtonDisabled = !tagName.trim() || tagName.trim().length < 2 || tagName.length > 12;
 
    return (
       <View className="flex-1 bg-slate-50">
@@ -294,6 +303,7 @@ export function ConfigureTagScreen() {
                      <TextInput
                         value={tagName}
                         onChangeText={handleNameChange}
+                        maxLength={12}
                         placeholder="Ex: Mochila Azul"
                         placeholderTextColor="#94A3B8"
                         className={`border rounded-xl px-4 py-4 text-slate-900 ${nameError ? 'border-red-400 bg-red-50' : 'border-slate-200'
