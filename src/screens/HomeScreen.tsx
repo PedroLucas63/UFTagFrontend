@@ -7,11 +7,18 @@ import { BottomNav } from "../components/BottomNav";
 import { Loading } from "../components/Loading";
 import { useAppNavigation } from "../navigation/types";
 import { useLiveDevices } from "../storage/devicesStorage";
+import { getDevices } from "../api/devices";
 
 export function HomeScreen() {
    const navigation = useAppNavigation();
 
    const tags = useLiveDevices();
+
+   useEffect(() => {
+      getDevices().catch((err) => {
+         console.error("[HomeScreen] Erro ao sincronizar dispositivos da API:", err);
+      });
+   }, []);
 
    const handleTagClick = (tag: (typeof tags)[0]) => {
       navigation.navigate("TagDetails", { tag });

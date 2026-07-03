@@ -13,12 +13,11 @@ import { ArrowLeft, Bluetooth, Tag } from "lucide-react-native";
 import { useAppNavigation } from "../navigation/types";
 import { BottomNav } from "../components/BottomNav";
 import { RippleAnimation } from "../components/RippleAnimation";
-import { BleManager, Device } from "react-native-ble-plx";
+import { Device } from "react-native-ble-plx";
+import { bleManager } from "../services/BleManager";
 
 // Importe o seu AlertModal do local correto no seu projeto
 import { AlertModal } from "../components/AlertModal";
-
-export const bleManager = new BleManager();
 
 const UFTAG_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
 const UFTAG_CHAR_ID_UUID = "0000fff3-0000-1000-8000-00805f9b34fb";

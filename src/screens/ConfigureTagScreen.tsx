@@ -24,7 +24,7 @@ import { CreateDeviceRequest, createDevice } from "../api/devices";
 import { Buffer } from "buffer";
 import { saveDevices } from "../storage/devicesStorage";
 
-import { bleManager } from "./AddTagScreen";
+import { bleManager } from "../services/BleManager";
 
 const STEPS = [
    "Preparando ambiente",

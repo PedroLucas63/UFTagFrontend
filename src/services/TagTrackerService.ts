@@ -1,6 +1,6 @@
 import { locationService } from './LocationService';
 import { Buffer } from 'buffer';
-import { bleManager } from '../screens/AddTagScreen';
+import { bleManager } from './BleManager';
 import { getAllPublicKey, updateDeviceState } from '../storage/devicesStorage';
 import { LocationReportRequest, reportLocation } from '../api/locations';
 import { Device } from 'react-native-ble-plx';
@@ -10,6 +10,8 @@ const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
 const UPDATE_THROTTLE_MS = 500; // 500ms
 const REPORT_THROTTLE_MS = 30000; // 30s
+const TARGET_RESPONSE_UUID = "0000abff-0000-1000-8000-00805f9b34fb";
+
 
 class TagTrackerService {
    private isScanning = false;
@@ -50,9 +52,14 @@ class TagTrackerService {
          }
       }, REPORT_THROTTLE_MS);
 
-      bleManager.startDeviceScan(null, { allowDuplicates: true }, async (error, device) => {
+      bleManager.startDeviceScan([TARGET_RESPONSE_UUID], { allowDuplicates: true }, async (error, device) => {
          if (error) {
             console.error("[TagTracker] Erro no scan:", error.message);
+            this.isScanning = false;
+            if (this.reportInterval) {
+               clearInterval(this.reportInterval);
+               this.reportInterval = null;
+            }
             return;
          }
 
@@ -68,10 +75,8 @@ class TagTrackerService {
 
             let fullKey: string | null = null;
 
-            const targetUUID = "0000abff-0000-1000-8000-00805f9b34fb";
-
-            if (device.serviceData && device.serviceData[targetUUID]) {
-               const part2Buffer = Buffer.from(device.serviceData[targetUUID], 'base64');
+            if (device.serviceData && device.serviceData[TARGET_RESPONSE_UUID]) {
+               const part2Buffer = Buffer.from(device.serviceData[TARGET_RESPONSE_UUID], 'base64');
 
                const fullKeyBuffer = Buffer.concat([part1Buffer, part2Buffer]);
                fullKey = fullKeyBuffer.toString('base64');
