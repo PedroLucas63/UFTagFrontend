@@ -6,7 +6,6 @@ import { LocationReportRequest, reportLocation } from '../api/locations';
 import { Device } from 'react-native-ble-plx';
 import { encryptWithPublicKey } from '../crypto/asymmetric';
 
-// ─── Constantes do protocolo UFTag ────────────────────────────────────────────
 const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
 const UPDATE_THROTTLE_MS = 500;   // ms entre updates da mesma tag
@@ -14,6 +13,9 @@ const REPORT_THROTTLE_MS = 30000; // ms entre envios de relatório para a API
 
 // UUID do serviceData que identifica um pacote UFTag
 const TARGET_RESPONSE_UUID = "0000abff-0000-1000-8000-00805f9b34fb";
+
+const UFTAG_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
+const UFTAG_CHAR_ID_UUID  = "0000fff3-0000-1000-8000-00805f9b34fb";
 
 // Layout do manufacturer data:
 //   [0..1] = Company ID (0xFF 0xFF)
@@ -29,14 +31,8 @@ class TagTrackerService {
 
    // Throttle de updates da própria tag
    private lastUpdateMap = new Map<string, number>();
-
-   // Índice rápido: 23-bytes base64 → deviceId (para lookup por manufacturer data)
    private partialKeyToDeviceId = new Map<string, string>();
-
-   // Índice rápido: 32-bytes base64 → deviceId (para lookup quando serviceData disponível)
    private fullKeyToDeviceId = new Map<string, string>();
-
-   // Relatórios pendentes de envio: partialKeyBase64 → payload
    private reportMap = new Map<string, LocationReportRequest>();
 
    private reportInterval: ReturnType<typeof setInterval> | null = null;
@@ -46,6 +42,9 @@ class TagTrackerService {
    private pktUftag = 0;
    private pktOwn   = 0;
    private pktLost  = 0;
+
+   private lastKeepAliveMap = new Map<string, number>();
+   private isConnectingMap = new Map<string, boolean>();
 
    // ─── API pública ──────────────────────────────────────────────────────────
 
@@ -76,7 +75,7 @@ class TagTrackerService {
          { allowDuplicates: true },
          async (error, device) => {
             if (error) {
-               console.error(`[BLE] ❌ Erro no scan:`, error.message, `| código: ${error.errorCode}`);
+               console.error(`[BLE]  Erro no scan:`, error.message, `| código: ${error.errorCode}`);
                this.isScanning = false;
                if (this.reportInterval) {
                   clearInterval(this.reportInterval);
@@ -115,12 +114,10 @@ class TagTrackerService {
       try {
          const rawData = Buffer.from(device.manufacturerData!, 'base64');
 
-         // Valida tamanho
          if (rawData.length < PART1_END) {
             return;
          }
 
-         // Valida company ID
          const cmpLo = rawData[0];
          const cmpHi = rawData[1];
          if (cmpLo !== COMPANY_ID_LO || cmpHi !== COMPANY_ID_HI) {
@@ -143,7 +140,7 @@ class TagTrackerService {
             fullKeyBuffer     = Buffer.concat([part1Buffer, part2Buffer]);
             fullKey           = fullKeyBuffer.toString('base64');
          } else {
-            console.warn(`[KEYS] ⚠️ serviceData ausente para UUID ${TARGET_RESPONSE_UUID} — chave completa indisponível`);
+            console.warn(`[KEYS] serviceData ausente para UUID ${TARGET_RESPONSE_UUID} — chave completa indisponível`);
          }
 
          // Reconhecimento de posse
@@ -159,8 +156,11 @@ class TagTrackerService {
             if (fullKey && fullKeyBuffer) {
                await this.queueLocationReport(partialKeyBase64, fullKey, fullKeyBuffer, device, /* isOwner */ true);
             } else {
-               console.warn(`[TagTracker] ⚠️ Chave completa ausente — report para API não enfileirado (sem serviceData)`);
+               console.warn(`[TagTracker] Chave completa ausente — report para API não enfileirado (sem serviceData)`);
             }
+
+            // Mantém a tag atualizada (keep-alive) conectando periodicamente ou se ela estiver perdida
+            this.sendKeepAlive(device, isLost);
 
          } else if (fullKey && fullKeyBuffer) {
             // TAG DE TERCEIRO
@@ -172,7 +172,7 @@ class TagTrackerService {
          }
 
       } catch (err) {
-         console.error(`[TagTracker] ❌ Erro ao processar pacote BLE:`, err);
+         console.error(`[TagTracker] Erro ao processar pacote BLE:`, err);
       }
    }
 
@@ -210,7 +210,7 @@ class TagTrackerService {
          this.reportMap.set(partialKeyBase64, report);
 
       } catch (err) {
-         console.error(`[TagTracker] ❌ Erro ao cifrar/enfileirar relatório:`, err);
+         console.error(`[TagTracker] Erro ao cifrar/enfileirar relatório:`, err);
       }
    }
 
@@ -252,12 +252,12 @@ class TagTrackerService {
       try {
          tags = await getAllPublicKey();
       } catch (err) {
-         console.error(`[KEYS] ❌ Falha ao chamar getAllPublicKey():`, err);
+         console.error(`[KEYS] Falha ao chamar getAllPublicKey():`, err);
          return;
       }
 
       if (tags.size === 0) {
-         console.warn(`[KEYS] ⚠️ Nenhuma chave pública encontrada no Keychain!`);
+         console.warn(`[KEYS] Nenhuma chave pública encontrada no Keychain!`);
          return;
       }
 
@@ -265,7 +265,7 @@ class TagTrackerService {
          const fullKeyBytes = Buffer.from(publicKeyBase64, 'base64');
 
          if (fullKeyBytes.length < PART1_LEN) {
-            console.warn(`[KEYS] ⚠️ Chave muito curta (${fullKeyBytes.length} bytes) — ignorada`);
+            console.warn(`[KEYS]  Chave muito curta (${fullKeyBytes.length} bytes) — ignorada`);
             continue;
          }
 
@@ -292,10 +292,47 @@ class TagTrackerService {
                await reportLocation(report);
                this.reportMap.delete(partialKey);
             } catch (error) {
-               console.error(`[TagTracker] ❌ Falha ao enviar relatório:`, error);
+               console.error(`[TagTracker]  Falha ao enviar relatório:`, error);
             }
          })
       );
+   }
+
+   private async sendKeepAlive(device: Device, isLost: boolean) {
+      const now = Date.now();
+      const lastKeepAlive = this.lastKeepAliveMap.get(device.id) ?? 0;
+
+      const intervalLimit = isLost ? 0 : 20000;
+
+      if (now - lastKeepAlive < intervalLimit) {
+         return;
+      }
+
+      // Evita conexões simultâneas para o mesmo dispositivo
+      if (this.isConnectingMap.get(device.id)) {
+         return;
+      }
+      this.isConnectingMap.set(device.id, true);
+      this.lastKeepAliveMap.set(device.id, now);
+
+      console.log(`[KeepAlive] 🔄 Iniciando conexão com a tag ${device.id} (Modo Perdido: ${isLost ? 'SIM' : 'NAO'})...`);
+      try {
+         const connected = await device.connect();
+         await connected.discoverAllServicesAndCharacteristics();
+         
+         // Lê característica segura para disparar o bonding/encriptação
+         await connected.readCharacteristicForService(
+            UFTAG_SERVICE_UUID,
+            UFTAG_CHAR_ID_UUID
+         );
+         
+         console.log(`[KeepAlive] Heartbeat enviado com sucesso para ${device.id}`);
+         await connected.cancelConnection();
+      } catch (err) {
+         console.warn(`[KeepAlive] Falha ao enviar keep-alive para ${device.id}:`, err);
+      } finally {
+         this.isConnectingMap.set(device.id, false);
+      }
    }
 }
 
