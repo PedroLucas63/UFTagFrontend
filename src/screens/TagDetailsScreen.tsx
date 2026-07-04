@@ -221,11 +221,32 @@ export function TagDetailsScreen() {
                      </View>
                   )}
 
-                  <View className={`self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full mt-3 ${tag.isNear ? 'bg-green-100' : 'bg-red-100'
+                  <View className={`self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full mt-3 ${
+                     tag.isNear 
+                        ? 'bg-green-100' 
+                        : tag.rssi === '-' 
+                           ? 'bg-slate-100' 
+                           : 'bg-red-100'
+                  }`}>
+                     <View className={`w-2 h-2 rounded-full ${
+                        tag.isNear 
+                           ? 'bg-green-500' 
+                           : tag.rssi === '-' 
+                              ? 'bg-slate-400' 
+                              : 'bg-red-500'
+                     }`} />
+                     <Text className={`text-sm font-medium ${
+                        tag.isNear 
+                           ? 'text-green-700' 
+                           : tag.rssi === '-' 
+                              ? 'text-slate-600' 
+                              : 'text-red-700'
                      }`}>
-                     <View className={`w-2 h-2 rounded-full ${tag.isNear ? 'bg-green-500' : 'bg-red-500'}`} />
-                     <Text className={`text-sm font-medium ${tag.isNear ? 'text-green-700' : 'text-red-700'}`}>
-                        {tag.isNear ? 'Próxima' : 'Distante'}
+                        {tag.isNear 
+                           ? 'Próxima' 
+                           : tag.rssi === '-' 
+                              ? 'Sem Sinal' 
+                              : 'Distante'}
                      </Text>
                   </View>
                </View>
@@ -262,7 +283,7 @@ export function TagDetailsScreen() {
                   <View className="flex-row items-center gap-3 p-4 bg-gray-50 rounded-2xl">
                      <Clock size={24} color="#475569" />
                      <View>
-                        <Text className="text-xs text-gray-500">Última atualização</Text>
+                        <Text className="text-xs text-gray-500">Atualizado</Text>
                         <Text className="font-semibold text-slate-900">{formatRelativeTime(tag.lastUpdate)}</Text>
                      </View>
                   </View>

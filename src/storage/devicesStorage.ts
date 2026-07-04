@@ -36,9 +36,14 @@ export interface LocalDevice extends LocalDeviceState {
 let memoryCache: Record<string, LocalDevice> | null = {};
 let pendingPersistTimeout: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<(devices: Record<string, LocalDevice>) => void>();
+const keyChangeListeners = new Set<() => void>();
 
 function notifyListeners() {
    listeners.forEach(listener => listener({ ...memoryCache }));
+}
+
+function notifyKeyChangeListeners() {
+   keyChangeListeners.forEach(listener => listener());
 }
 
 export function subscribeToDeviceChanges(
@@ -47,6 +52,17 @@ export function subscribeToDeviceChanges(
    listeners.add(listener);
    return () => {
       listeners.delete(listener);
+   };
+}
+
+/**
+ * Assina o canal de mudanças ESTRUTURAIS (tag cadastrada/removida).
+ * NÃO é disparado por atualizações de RSSI ou localização.
+ */
+export function subscribeToKeyChanges(listener: () => void) {
+   keyChangeListeners.add(listener);
+   return () => {
+      keyChangeListeners.delete(listener);
    };
 }
 
@@ -139,6 +155,11 @@ export async function saveDevices(devices: DeviceResponse[]) {
    // Salva o novo cache e o momento exato da sincronização
    await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
    await AsyncStorage.setItem(CACHE_SYNC_TIME_KEY, Date.now().toString());
+
+   // Atualiza o cache em memória, notifica ouvintes de estado E de chaves
+   memoryCache = localCache;
+   notifyListeners();
+   notifyKeyChangeListeners(); // apenas aqui — nunca no updateDeviceState
 }
 
 export async function getAllPublicKey(): Promise<Map<string, string>> {
@@ -246,6 +267,15 @@ export async function updateDeviceState(
    await loadMemoryCache();
 
    if (memoryCache && memoryCache[deviceId]) {
+      const current = memoryCache[deviceId];
+      const hasChanges = Object.keys(updates).some(
+         key => (updates as any)[key] !== (current as any)[key]
+      );
+
+      if (!hasChanges) {
+         return;
+      }
+
       memoryCache[deviceId] = {
          ...memoryCache[deviceId],
          ...updates,

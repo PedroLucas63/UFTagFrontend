@@ -80,7 +80,7 @@ export function TagCard({
             <View className="flex-row items-center gap-2">
                <Clock size={16} color="#64748B" />
                <Text className="text-sm text-slate-500">
-                  Última atualização: {formatRelativeTime(lastUpdate)}
+                  Atualizado: {formatRelativeTime(lastUpdate)}
                </Text>
             </View>
          </View>
