@@ -25,6 +25,7 @@ import { Buffer } from "buffer";
 import { saveDevices } from "../storage/devicesStorage";
 
 import { bleManager } from "../services/BleManager";
+import { renameTagAndSyncBle } from "../services/TagService";
 
 const STEPS = [
    "Preparando ambiente",
@@ -123,7 +124,7 @@ export function ConfigureTagScreen() {
                bleError.message?.includes("disconnected") || bleError.errorCode === 201;
 
             if (!isIntentionalDisconnect) {
-               console.error("Erro BLE:", bleError);
+               console.error("Erro BLE ao gravar chave:", bleError);
                throw new Error("Falha ao gravar a chave de segurança na Tag.");
             }
          }
@@ -143,6 +144,14 @@ export function ConfigureTagScreen() {
 
          if (!response.ok) {
             throw new Error(response.error || "Falha ao registrar dispositivo na nuvem.");
+         }
+
+         // Sincroniza o nome físico na tag usando a função do TagService
+         console.log(`[ConfigureTag] Sincronizando nome da tag no hardware via TagService...`);
+         try {
+            await renameTagAndSyncBle(deviceId, name);
+         } catch (syncErr: any) {
+            console.warn("[ConfigureTag] Aviso: Falha ao sincronizar nome no hardware:", syncErr.message);
          }
 
          // Etapa 3: Finalização (Sucesso)
