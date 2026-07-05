@@ -15,7 +15,7 @@ const REPORT_THROTTLE_MS = 30000; // ms entre envios de relatório para a API
 const TARGET_RESPONSE_UUID = "0000abff-0000-1000-8000-00805f9b34fb";
 
 const UFTAG_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
-const UFTAG_CHAR_ID_UUID  = "0000fff3-0000-1000-8000-00805f9b34fb";
+const UFTAG_CHAR_ID_UUID = "0000fff3-0000-1000-8000-00805f9b34fb";
 
 // Layout do manufacturer data:
 //   [0..1] = Company ID (0xFF 0xFF)
@@ -23,8 +23,8 @@ const UFTAG_CHAR_ID_UUID  = "0000fff3-0000-1000-8000-00805f9b34fb";
 //   [3..25] = primeiros 23 bytes da chave pública Curve25519
 //   serviceData[TARGET_RESPONSE_UUID] = últimos 9 bytes da chave → total 32
 const PART1_OFFSET = 3;
-const PART1_LEN    = 23;          // bytes[3..25]
-const PART1_END    = PART1_OFFSET + PART1_LEN; // = 26
+const PART1_LEN = 23;          // bytes[3..25]
+const PART1_END = PART1_OFFSET + PART1_LEN; // = 26
 
 class TagTrackerService {
    private isScanning = false;
@@ -40,8 +40,8 @@ class TagTrackerService {
    // Contadores de pacotes para diagnóstico
    private pktTotal = 0;
    private pktUftag = 0;
-   private pktOwn   = 0;
-   private pktLost  = 0;
+   private pktOwn = 0;
+   private pktLost = 0;
 
    private lastKeepAliveMap = new Map<string, number>();
    private isConnectingMap = new Map<string, boolean>();
@@ -128,25 +128,25 @@ class TagTrackerService {
          const isLost = rawData[2] === 0x01;
 
          // Extrai parte 1 da chave (23 bytes do manufacturer data)
-         const part1Buffer     = rawData.subarray(PART1_OFFSET, PART1_END);
+         const part1Buffer = rawData.subarray(PART1_OFFSET, PART1_END);
          const partialKeyBase64 = Buffer.from(part1Buffer).toString('base64');
 
          // Extrai parte 2 da chave (serviceData → 9 bytes)
-         let fullKey: string | null        = null;
-         let fullKeyBuffer: Buffer | null  = null;
+         let fullKey: string | null = null;
+         let fullKeyBuffer: Buffer | null = null;
 
          if (device.serviceData && device.serviceData[TARGET_RESPONSE_UUID]) {
             const part2Buffer = Buffer.from(device.serviceData[TARGET_RESPONSE_UUID], 'base64');
-            fullKeyBuffer     = Buffer.concat([part1Buffer, part2Buffer]);
-            fullKey           = fullKeyBuffer.toString('base64');
+            fullKeyBuffer = Buffer.concat([part1Buffer, part2Buffer]);
+            fullKey = fullKeyBuffer.toString('base64');
          } else {
             console.warn(`[KEYS] serviceData ausente para UUID ${TARGET_RESPONSE_UUID} — chave completa indisponível`);
          }
 
          // Reconhecimento de posse
          const myDeviceIdByPartial = this.partialKeyToDeviceId.get(partialKeyBase64);
-         const myDeviceIdByFull    = fullKey ? this.fullKeyToDeviceId.get(fullKey) : undefined;
-         const myDeviceId          = myDeviceIdByPartial ?? myDeviceIdByFull;
+         const myDeviceIdByFull = fullKey ? this.fullKeyToDeviceId.get(fullKey) : undefined;
+         const myDeviceId = myDeviceIdByPartial ?? myDeviceIdByFull;
 
          if (myDeviceId) {
             // TAG DO PRÓPRIO USUÁRIO
@@ -190,21 +190,21 @@ class TagTrackerService {
       }
 
       try {
-         const location    = locationService.getLastKnownPosition();
-         const lat         = location?.latitude  ?? 0;
-         const lng         = location?.longitude ?? 0;
+         const location = locationService.getLastKnownPosition();
+         const lat = location?.latitude ?? 0;
+         const lng = location?.longitude ?? 0;
          const locationStr = `${lat};${lng}`;
 
          const locationEncrypted = await encryptWithPublicKey(locationStr, fullKeyBuffer);
 
          const report: LocationReportRequest = {
-            Key:               fullKey,
+            Key: fullKey,
             LocationEncrypted: locationEncrypted,
-            Rssi:              device.rssi ?? 0,
-            Battery:           device.txPowerLevel !== null && device.txPowerLevel !== undefined
-                                  ? Math.max(0, Math.min(100, Math.round(device.txPowerLevel * 100)))
-                                  : 0,
-            Timestamp:         new Date().toISOString(),
+            Rssi: device.rssi ?? 0,
+            Battery: device.txPowerLevel !== null && device.txPowerLevel !== undefined
+               ? Math.max(0, Math.min(100, Math.round(device.txPowerLevel * 100)))
+               : 0,
+            Timestamp: new Date().toISOString(),
          };
 
          this.reportMap.set(partialKeyBase64, report);
@@ -222,7 +222,7 @@ class TagTrackerService {
       rssi: number | null,
       isLost: boolean,
    ) {
-      const now        = Date.now();
+      const now = Date.now();
       const lastUpdate = this.lastUpdateMap.get(cacheKey) ?? 0;
 
       if (now - lastUpdate < UPDATE_THROTTLE_MS) {
@@ -231,12 +231,12 @@ class TagTrackerService {
       this.lastUpdateMap.set(cacheKey, now);
 
       const location = locationService.getLastKnownPosition();
-      const isNear   = rssi !== null ? rssi > -75 : false;
+      const isNear = rssi !== null ? rssi > -75 : false;
 
       await updateDeviceState(deviceId, {
-         rssi:        rssi !== null ? rssi.toString() : '-',
+         rssi: rssi !== null ? rssi.toString() : '-',
          isNear,
-         locationLat: location?.latitude  ?? null,
+         locationLat: location?.latitude ?? null,
          locationLng: location?.longitude ?? null,
          locationText: location ? 'Atualizado via GPS' : '-',
       });
@@ -271,7 +271,7 @@ class TagTrackerService {
 
          this.fullKeyToDeviceId.set(publicKeyBase64, deviceId);
 
-         const partialBytes  = fullKeyBytes.subarray(0, PART1_LEN);
+         const partialBytes = fullKeyBytes.subarray(0, PART1_LEN);
          const partialBase64 = Buffer.from(partialBytes).toString('base64');
          this.partialKeyToDeviceId.set(partialBase64, deviceId);
       }
@@ -319,13 +319,13 @@ class TagTrackerService {
       try {
          const connected = await device.connect();
          await connected.discoverAllServicesAndCharacteristics();
-         
+
          // Lê característica segura para disparar o bonding/encriptação
          await connected.readCharacteristicForService(
             UFTAG_SERVICE_UUID,
             UFTAG_CHAR_ID_UUID
          );
-         
+
          console.log(`[KeepAlive] Heartbeat enviado com sucesso para ${device.id}`);
          await connected.cancelConnection();
       } catch (err) {
@@ -333,6 +333,20 @@ class TagTrackerService {
       } finally {
          this.isConnectingMap.set(device.id, false);
       }
+   }
+
+   clearState() {
+      this.stopTracking();
+      this.partialKeyToDeviceId.clear();
+      this.fullKeyToDeviceId.clear();
+      this.isConnectingMap.clear();
+      this.lastKeepAliveMap.clear();
+      this.reportMap.clear();
+      this.lastUpdateMap.clear();
+      this.pktTotal = 0;
+      this.pktUftag = 0;
+      this.pktOwn = 0;
+      this.pktLost = 0;
    }
 }
 

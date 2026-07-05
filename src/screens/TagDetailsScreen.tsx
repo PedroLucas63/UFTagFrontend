@@ -109,39 +109,39 @@ export function TagDetailsScreen() {
       distanceText = `~${distance.toFixed(1)}m`;
 
       if (rssiVal >= -60) {
-         signalStatus = 'Muito Próximo (Sinal Forte)';
+         signalStatus = 'Excelente (Próximo)';
          signalColor = 'text-green-500';
       } else if (rssiVal >= -75) {
-         signalStatus = 'Próximo (Sinal Médio)';
+         signalStatus = 'Bom (Médio)';
          signalColor = 'text-yellow-500';
       } else if (rssiVal >= -90) {
-         signalStatus = 'Longe (Sinal Fraco)';
+         signalStatus = 'Ruim (Longe)';
          signalColor = 'text-orange-500';
       } else {
-         signalStatus = 'Muito Longe (Sinal Muito Fraco)';
+         signalStatus = 'Sem Sinal (Muito Longe)';
          signalColor = 'text-red-500';
       }
    }
 
-    const handleSaveName = async () => {
-       const name = tagName.trim();
-       if (name.length < 2 || name.length > 12) {
-          Alert.alert("Erro", "O nome deve conter entre 2 e 12 caracteres.");
-          return;
-       }
+   const handleSaveName = async () => {
+      const name = tagName.trim();
+      if (name.length < 2 || name.length > 12) {
+         Alert.alert("Erro", "O nome deve conter entre 2 e 12 caracteres.");
+         return;
+      }
 
-       setIsSavingName(true);
-       try {
-          await renameTagAndSyncBle(tag.id, name);
-          setIsEditing(false);
-          Alert.alert("Sucesso", "Nome alterado e sincronizado com a Tag!");
-       } catch (err: any) {
-          console.error("[TagDetails] Falha ao renomear dispositivo:", err);
-          Alert.alert("Erro de Sincronização", err.message || "Não foi possível sincronizar o novo nome com a Tag.");
-       } finally {
-          setIsSavingName(false);
-       }
-    };
+      setIsSavingName(true);
+      try {
+         await renameTagAndSyncBle(tag.id, name);
+         setIsEditing(false);
+         Alert.alert("Sucesso", "Nome alterado e sincronizado com a Tag!");
+      } catch (err: any) {
+         console.error("[TagDetails] Falha ao renomear dispositivo:", err);
+         Alert.alert("Erro de Sincronização", err.message || "Não foi possível sincronizar o novo nome com a Tag.");
+      } finally {
+         setIsSavingName(false);
+      }
+   };
 
    const handleBuzzer = async () => {
       setShowBuzzerModal(true);
@@ -191,24 +191,24 @@ export function TagDetailsScreen() {
             <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
                <View className="mb-6">
                   {isEditing ? (
-                      <View className="flex-row items-center gap-2">
-                         <TextInput
-                            value={tagName}
-                            onChangeText={setTagName}
-                            editable={!isSavingName}
-                            maxLength={12}
-                            className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-slate-900"
-                         />
-                         <TouchableOpacity
-                            onPress={handleSaveName}
-                            disabled={isSavingName}
-                            className={`px-5 py-3 rounded-xl ${isSavingName ? 'bg-slate-300' : 'bg-blue-600'}`}
-                         >
-                            <Text className="text-white font-semibold">
-                               {isSavingName ? 'Salvando...' : 'Salvar'}
-                            </Text>
-                         </TouchableOpacity>
-                      </View>
+                     <View className="flex-row items-center gap-2">
+                        <TextInput
+                           value={tagName}
+                           onChangeText={setTagName}
+                           editable={!isSavingName}
+                           maxLength={12}
+                           className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-slate-900"
+                        />
+                        <TouchableOpacity
+                           onPress={handleSaveName}
+                           disabled={isSavingName}
+                           className={`px-5 py-3 rounded-xl ${isSavingName ? 'bg-slate-300' : 'bg-blue-600'}`}
+                        >
+                           <Text className="text-white font-semibold">
+                              {isSavingName ? 'Salvando...' : 'Salvar'}
+                           </Text>
+                        </TouchableOpacity>
+                     </View>
                   ) : (
                      <View className="flex-row items-center justify-between">
                         <Text className="text-2xl font-bold text-slate-900">{tagName}</Text>
@@ -221,31 +221,28 @@ export function TagDetailsScreen() {
                      </View>
                   )}
 
-                  <View className={`self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full mt-3 ${
-                     tag.isNear 
-                        ? 'bg-green-100' 
-                        : tag.rssi === '-' 
-                           ? 'bg-slate-100' 
+                  <View className={`self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full mt-3 ${tag.isNear
+                        ? 'bg-green-100'
+                        : tag.rssi === '-'
+                           ? 'bg-slate-100'
                            : 'bg-red-100'
-                  }`}>
-                     <View className={`w-2 h-2 rounded-full ${
-                        tag.isNear 
-                           ? 'bg-green-500' 
-                           : tag.rssi === '-' 
-                              ? 'bg-slate-400' 
-                              : 'bg-red-500'
-                     }`} />
-                     <Text className={`text-sm font-medium ${
-                        tag.isNear 
-                           ? 'text-green-700' 
-                           : tag.rssi === '-' 
-                              ? 'text-slate-600' 
-                              : 'text-red-700'
                      }`}>
-                        {tag.isNear 
-                           ? 'Próxima' 
-                           : tag.rssi === '-' 
-                              ? 'Sem Sinal' 
+                     <View className={`w-2 h-2 rounded-full ${tag.isNear
+                           ? 'bg-green-500'
+                           : tag.rssi === '-'
+                              ? 'bg-slate-400'
+                              : 'bg-red-500'
+                        }`} />
+                     <Text className={`text-sm font-medium ${tag.isNear
+                           ? 'text-green-700'
+                           : tag.rssi === '-'
+                              ? 'text-slate-600'
+                              : 'text-red-700'
+                        }`}>
+                        {tag.isNear
+                           ? 'Próxima'
+                           : tag.rssi === '-'
+                              ? 'Sem Sinal'
                               : 'Distante'}
                      </Text>
                   </View>
@@ -378,25 +375,25 @@ export function TagDetailsScreen() {
                      >
                         <View className={`w-6 h-6 rounded-full border-2 border-white shadow-lg justify-center items-center ${rssiVal !== null ? 'bg-green-500' : 'bg-slate-500'}`}>
                            {beepActive && (
-                              <View 
-                                 className="absolute border border-green-400 rounded-full" 
-                                 style={{ width: 40, height: 40, opacity: 0.5 }} 
+                              <View
+                                 className="absolute border border-green-400 rounded-full"
+                                 style={{ width: 40, height: 40, opacity: 0.5 }}
                               />
                            )}
                         </View>
-                        <View 
-                           style={{ 
-                              position: 'absolute', 
-                              top: -32, 
-                              left: -63, 
-                              width: 150, 
-                              alignItems: 'center' 
+                        <View
+                           style={{
+                              position: 'absolute',
+                              top: -32,
+                              left: -63,
+                              width: 150,
+                              alignItems: 'center'
                            }}
                         >
                            <View className="bg-green-600 px-2.5 py-1 rounded-md shadow-md max-w-full">
-                              <Text 
-                                 className="text-white text-xs font-bold" 
-                                 numberOfLines={1} 
+                              <Text
+                                 className="text-white text-xs font-bold"
+                                 numberOfLines={1}
                                  ellipsizeMode="tail"
                               >
                                  {tagName}

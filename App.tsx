@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Platform, PermissionsAndroid } from "react-native";
 import { locationService } from "./src/services/LocationService";
 import { tagTrackerService } from "./src/services/TagTrackerService";
+import { subscribeAuthState } from "./src/auth/authState";
 import BackgroundJob from "react-native-background-actions";
 
 const sleep = (time: number) => new Promise<void>((resolve) => setTimeout(resolve, time));
@@ -58,21 +59,43 @@ async function requestPermissions(): Promise<boolean> {
 
 export default function App() {
   useEffect(() => {
-    const initTracking = async () => {
-      const granted = await requestPermissions();
-      if (granted) {
-        locationService.startWatching();
-        BackgroundJob.start(taskBackgroundTracking, options).catch((err: any) => {
-          console.error("Erro ao iniciar o rastreamento em segundo plano:", err);
-        });
+    const handleAuthChange = async (isAuthenticated: boolean) => {
+      if (isAuthenticated) {
+        const granted = await requestPermissions();
+        if (granted) {
+          locationService.startWatching();
+          if (!BackgroundJob.isRunning()) {
+            BackgroundJob.start(taskBackgroundTracking, options).catch((err: any) => {
+              console.error("Erro ao iniciar o rastreamento em segundo plano:", err);
+            });
+          } else {
+            // Se o background job já estiver rodando, força o recarregamento das chaves
+            // e reinicia o scan BLE para as novas tags
+            await tagTrackerService.startBackgroundTracking();
+          }
+        } else {
+          console.log("[App] Permissões negadas. Rastreamento em segundo plano não foi iniciado.");
+        }
       } else {
-        console.log("[App] Permissões negadas. Rastreamento em segundo plano não foi iniciado.");
+        // Usuário deslogado: para rastreamento e limpa estado em memória
+        locationService.stopWatching();
+        tagTrackerService.clearState();
+        if (BackgroundJob.isRunning()) {
+          try {
+            await BackgroundJob.stop();
+          } catch (err) {
+            console.error("Erro ao parar o background job:", err);
+          }
+        }
       }
     };
 
-    initTracking();
+    const unsubscribe = subscribeAuthState((isAuthenticated) => {
+      handleAuthChange(isAuthenticated);
+    });
 
     return () => {
+      unsubscribe();
       locationService.stopWatching();
       tagTrackerService.stopTracking();
       if (BackgroundJob.isRunning()) {

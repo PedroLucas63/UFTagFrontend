@@ -7,6 +7,7 @@ import { BottomNav } from "../components/BottomNav";
 import { useAppNavigation } from "../navigation/types";
 import { useLiveDevices } from "../storage/devicesStorage";
 import { getDevices } from "../api/devices";
+import { getLatestLocationsByKeys } from "../api/locations";
 
 function TagCardSkeleton() {
    return (
@@ -35,19 +36,25 @@ export function HomeScreen() {
 
    useEffect(() => {
       setIsLoading(true);
-      getDevices()
-         .catch((err) => {
-            console.error("[HomeScreen] Erro ao sincronizar dispositivos da API:", err);
-         })
-         .finally(() => {
+      const initLoad = async () => {
+         try {
+            await getDevices();
+            // Após carregar as tags e chaves, busca a última localização no banco
+            await getLatestLocationsByKeys();
+         } catch (err) {
+            console.error("[HomeScreen] Erro ao sincronizar tags:", err);
+         } finally {
             setIsLoading(false);
-         });
+         }
+      };
+      initLoad();
    }, []);
 
    const onRefresh = async () => {
       setRefreshing(true);
       try {
          await getDevices();
+         await getLatestLocationsByKeys();
       } catch (err) {
          console.error("[HomeScreen] Erro ao sincronizar tags:", err);
       } finally {

@@ -95,6 +95,8 @@ export async function saveDevices(devices: DeviceResponse[]) {
    const existingCacheStr = await AsyncStorage.getItem(CACHE_DEVICES_KEY);
    const localCache: Record<string, LocalDevice> = existingCacheStr ? JSON.parse(existingCacheStr) : {};
 
+   const newCache: Record<string, LocalDevice> = {};
+
    for (const device of devices) {
       if (!device.keysSalt || !device.encryptedPublicKey || !device.encryptedPrivateKey) {
          continue;
@@ -139,7 +141,7 @@ export async function saveDevices(devices: DeviceResponse[]) {
       );
 
       // Atualiza o cache local com os metadados da API preservando o estado dinâmico (sensores)
-      localCache[device.id] = {
+      newCache[device.id] = {
          id: device.id,
          name: device.name,
          battery: localCache[device.id]?.battery ?? null,
@@ -152,14 +154,37 @@ export async function saveDevices(devices: DeviceResponse[]) {
       };
    }
 
+   // Limpa do Keychain as chaves dos dispositivos que foram removidos
+   for (const oldId of Object.keys(localCache)) {
+      if (!newCache[oldId]) {
+         await Keychain.resetGenericPassword({ service: `device.${oldId}.publicKey` });
+         await Keychain.resetGenericPassword({ service: `device.${oldId}.privateKey` });
+      }
+   }
+
    // Salva o novo cache e o momento exato da sincronização
-   await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(localCache));
+   await AsyncStorage.setItem(CACHE_DEVICES_KEY, JSON.stringify(newCache));
    await AsyncStorage.setItem(CACHE_SYNC_TIME_KEY, Date.now().toString());
 
    // Atualiza o cache em memória, notifica ouvintes de estado E de chaves
-   memoryCache = localCache;
+   memoryCache = newCache;
    notifyListeners();
    notifyKeyChangeListeners(); // apenas aqui — nunca no updateDeviceState
+}
+
+export async function clearDevices() {
+   await loadMemoryCache();
+   if (memoryCache) {
+      for (const deviceId of Object.keys(memoryCache)) {
+         await Keychain.resetGenericPassword({ service: `device.${deviceId}.publicKey` });
+         await Keychain.resetGenericPassword({ service: `device.${deviceId}.privateKey` });
+      }
+   }
+   memoryCache = {};
+   await AsyncStorage.removeItem(CACHE_DEVICES_KEY);
+   await AsyncStorage.removeItem(CACHE_SYNC_TIME_KEY);
+   notifyListeners();
+   notifyKeyChangeListeners();
 }
 
 export async function getAllPublicKey(): Promise<Map<string, string>> {
@@ -266,25 +291,28 @@ export async function updateDeviceState(
 ) {
    await loadMemoryCache();
 
-   if (memoryCache && memoryCache[deviceId]) {
-      const current = memoryCache[deviceId];
-      const hasChanges = Object.keys(updates).some(
-         key => (updates as any)[key] !== (current as any)[key]
-      );
-
-      if (!hasChanges) {
-         return;
-      }
-
-      memoryCache[deviceId] = {
-         ...memoryCache[deviceId],
-         ...updates,
-         lastUpdate: new Date().toISOString(),
-      };
-
-      notifyListeners();
+   if (!memoryCache || !memoryCache[deviceId]) {
+      console.warn(`[Storage] updateDeviceState: deviceId "${deviceId}" não encontrado no cache. Atualização ignorada.`);
+      schedulePersist();
+      return;
    }
 
+   const current = memoryCache[deviceId];
+   const hasChanges = Object.keys(updates).some(
+      key => (updates as any)[key] !== (current as any)[key]
+   );
+
+   if (!hasChanges) {
+      return;
+   }
+
+   memoryCache[deviceId] = {
+      ...memoryCache[deviceId],
+      ...updates,
+      lastUpdate: updates.lastUpdate ?? new Date().toISOString(),
+   };
+
+   notifyListeners();
    schedulePersist();
 }
 

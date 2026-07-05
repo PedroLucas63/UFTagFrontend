@@ -12,6 +12,8 @@ import {
    ApiResult,
    request,
 } from "./request";
+import { clearDevices } from "../storage/devicesStorage";
+import { tagTrackerService } from "../services/TagTrackerService";
 
 type LoginResponse = {
    accessToken: string;
@@ -94,5 +96,15 @@ export async function logout(): Promise<void> {
    await removeAccessToken();
    await removeRefreshToken();
    await removePassword();
+   try {
+      await clearDevices();
+   } catch (err) {
+      console.error("[Auth] Erro ao limpar dispositivos no logout:", err);
+   }
+   try {
+      tagTrackerService.clearState();
+   } catch (err) {
+      console.error("[Auth] Erro ao limpar estado do tracker no logout:", err);
+   }
    setAuthState(false);
 }

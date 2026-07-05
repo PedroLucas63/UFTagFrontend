@@ -42,7 +42,9 @@ export async function getLatestLocation(deviceId: string): Promise<ApiResult<Loc
                 locationLng: coords.lng,
                 locationText: locationText,
                 rssi: result.data.rssi.toString(),
-                battery: result.data.battery
+                isNear: result.data.rssi > -75,
+                battery: result.data.battery,
+                lastUpdate: result.data.createdAt,
             });
         }
     }
@@ -102,7 +104,9 @@ export async function getLatestLocationsByKeys(): Promise<ApiResult<LocationResp
                     locationLng: coords.lng,
                     locationText: locationText,
                     rssi: locationItem.rssi.toString(),
-                    battery: locationItem.battery
+                    isNear: locationItem.rssi > -75,
+                    battery: locationItem.battery,
+                    lastUpdate: locationItem.createdAt,
                 });
             }
         });
