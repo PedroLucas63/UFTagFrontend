@@ -1,4 +1,4 @@
-import { getDeviceKeys, updateDeviceState } from "../storage/devicesStorage";
+import { getDeviceKeys, updateDeviceState, getLocalDevices } from "../storage/devicesStorage";
 import { fetchLocationText, getNewPublicKeys, getPrivateKeysMap, processLocationDecryption, PublicKeyInfo } from "../utils/locationUtils";
 import { apiClient } from "./client";
 import { ApiResult, request } from "./request";
@@ -85,6 +85,12 @@ export async function getLatestLocationsByKeys(): Promise<ApiResult<LocationResp
             keysList.forEach(k => { pubKeyToDeviceId[k.publicKey] = deviceId; });
         }
 
+        const { devices: localDevices } = await getLocalDevices();
+        const localDeviceMap: Record<string, string | null> = {};
+        for (const d of localDevices) {
+            localDeviceMap[d.id] = d.lastUpdate;
+        }
+
         const updatePromises = result.data.map(async (locationItem) => {
             if (!locationItem.locationEncrypted) return;
 
@@ -93,6 +99,13 @@ export async function getLatestLocationsByKeys(): Promise<ApiResult<LocationResp
             const deviceId = pubKeyToDeviceId[publicKey];
 
             if (!privateKey || !deviceId) return;
+
+            // Não sobrescreve dados locais que já são mais recentes que a API
+            const localLastUpdate = localDeviceMap[deviceId];
+            if (localLastUpdate && new Date(localLastUpdate) > new Date(locationItem.createdAt)) {
+                console.log(`[Locations] Cache local mais recente que a API para ${deviceId} — mantendo dados BLE.`);
+                return;
+            }
 
             const coords = await processLocationDecryption(locationItem.locationEncrypted, publicKey, privateKey);
 

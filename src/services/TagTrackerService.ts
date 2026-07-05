@@ -185,10 +185,6 @@ class TagTrackerService {
       device: Device,
       isOwner: boolean,
    ) {
-      if (this.reportMap.has(partialKeyBase64)) {
-         return;
-      }
-
       try {
          const location = locationService.getLastKnownPosition();
          const lat = location?.latitude ?? 0;
