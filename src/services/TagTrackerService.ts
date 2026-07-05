@@ -298,7 +298,7 @@ class TagTrackerService {
       const now = Date.now();
       const lastKeepAlive = this.lastKeepAliveMap.get(device.id) ?? 0;
 
-      const intervalLimit = isLost ? 0 : 20000;
+      const intervalLimit = 20000;
 
       if (now - lastKeepAlive < intervalLimit) {
          return;
