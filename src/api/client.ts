@@ -7,6 +7,7 @@ const skipAuthEndpoints = [
    "/register",
    "/auth/refresh",
    "/devices/public",
+   "/locations/report",
 ];
 
 export const apiClient = axios.create({

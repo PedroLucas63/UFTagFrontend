@@ -5,11 +5,12 @@ import { getAllPublicKey, updateDeviceState } from '../storage/devicesStorage';
 import { LocationReportRequest, reportLocation } from '../api/locations';
 import { Device } from 'react-native-ble-plx';
 import { encryptWithPublicKey } from '../crypto/asymmetric';
+import { fetchLocationText } from '../utils/locationUtils';
 
 const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
 const UPDATE_THROTTLE_MS = 500;   // ms entre updates da mesma tag
-const REPORT_THROTTLE_MS = 30000; // ms entre envios de relatório para a API
+const REPORT_THROTTLE_MS = 5000; // ms entre envios de relatório para a API
 
 // UUID do serviceData que identifica um pacote UFTag
 const TARGET_RESPONSE_UUID = "0000abff-0000-1000-8000-00805f9b34fb";
@@ -135,12 +136,11 @@ class TagTrackerService {
          let fullKey: string | null = null;
          let fullKeyBuffer: Buffer | null = null;
 
-         if (device.serviceData && device.serviceData[TARGET_RESPONSE_UUID]) {
-            const part2Buffer = Buffer.from(device.serviceData[TARGET_RESPONSE_UUID], 'base64');
+         const hasServiceData = !!(device.serviceData && device.serviceData[TARGET_RESPONSE_UUID]);
+         if (hasServiceData) {
+            const part2Buffer = Buffer.from(device.serviceData![TARGET_RESPONSE_UUID], 'base64');
             fullKeyBuffer = Buffer.concat([part1Buffer, part2Buffer]);
             fullKey = fullKeyBuffer.toString('base64');
-         } else {
-            console.warn(`[KEYS] serviceData ausente para UUID ${TARGET_RESPONSE_UUID} — chave completa indisponível`);
          }
 
          // Reconhecimento de posse
@@ -151,23 +151,33 @@ class TagTrackerService {
          if (myDeviceId) {
             // TAG DO PRÓPRIO USUÁRIO
             this.pktOwn++;
+            console.log(`[TagTracker] Tag própria detectada: ID ${myDeviceId} | RSSI: ${device.rssi} | Modo Perdido: ${isLost ? 'SIM' : 'NÃO'}`);
+            
             await this.processFoundTag(myDeviceId, partialKeyBase64, device.rssi, isLost);
 
             if (fullKey && fullKeyBuffer) {
                await this.queueLocationReport(partialKeyBase64, fullKey, fullKeyBuffer, device, /* isOwner */ true);
             } else {
-               console.warn(`[TagTracker] Chave completa ausente — report para API não enfileirado (sem serviceData)`);
+               console.warn(`[TagTracker] Chave completa de tag própria ausente (sem serviceData). Não foi possível enfileirar o reporte para API.`);
             }
 
-            // Mantém a tag atualizada (keep-alive) conectando periodicamente ou se ela estiver perdida
+            // Mantém a tag atualizada (keep-alive) conectando periodicamente
             this.sendKeepAlive(device, isLost);
 
-         } else if (fullKey && fullKeyBuffer) {
+         } else {
             // TAG DE TERCEIRO
+            if (!fullKey || !fullKeyBuffer) {
+               console.log(`[TagTracker] Tag de terceiro avistada (RSSI: ${device.rssi}), mas descartada: chave incompleta (serviceData ausente)`);
+               return;
+            }
+
             if (isLost) {
-               // Terceiro só envia se a flag isLost estiver ativa
                this.pktLost++;
+               console.log(`[TagTracker] Tag de terceiro PERDIDA avistada (RSSI: ${device.rssi}). Enfileirando reporte de localização...`);
                await this.queueLocationReport(partialKeyBase64, fullKey, fullKeyBuffer, device, /* isOwner */ false);
+            } else {
+               // Muito importante para depuração: tag de terceiro ignorada porque não está perdida
+               console.log(`[TagTracker] ⚪ Tag de terceiro avistada (RSSI: ${device.rssi}), mas ignorada: NÃO está em modo perdido.`);
             }
          }
 
@@ -229,12 +239,22 @@ class TagTrackerService {
       const location = locationService.getLastKnownPosition();
       const isNear = rssi !== null ? rssi > -75 : false;
 
+      let locationText = '-';
+      if (location) {
+         try {
+            locationText = await fetchLocationText(location.latitude, location.longitude);
+         } catch (err) {
+            console.warn("[TagTracker] Falha ao converter coordenadas em endereço:", err);
+            locationText = 'Atualizado via GPS';
+         }
+      }
+
       await updateDeviceState(deviceId, {
          rssi: rssi !== null ? rssi.toString() : '-',
          isNear,
          locationLat: location?.latitude ?? null,
          locationLng: location?.longitude ?? null,
-         locationText: location ? 'Atualizado via GPS' : '-',
+         locationText: locationText,
       });
    }
 
@@ -285,10 +305,15 @@ class TagTrackerService {
       await Promise.all(
          entries.map(async ([partialKey, report]) => {
             try {
-               await reportLocation(report);
-               this.reportMap.delete(partialKey);
+               const res = await reportLocation(report);
+               if (res.ok) {
+                  this.reportMap.delete(partialKey);
+                  console.log(`[TagTracker] Relatório de localização enviado com sucesso para a chave: ${partialKey.substring(0, 10)}...`);
+               } else {
+                  console.warn(`[TagTracker] Falha ao enviar relatório (API rejeitou):`, res.error);
+               }
             } catch (error) {
-               console.error(`[TagTracker]  Falha ao enviar relatório:`, error);
+               console.error(`[TagTracker] Erro inesperado ao enviar relatório:`, error);
             }
          })
       );

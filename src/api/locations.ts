@@ -138,8 +138,8 @@ export type LocationReportRequest = {
     Timestamp: string;
 }
 
-export async function reportLocation(locationRequest: LocationReportRequest) {
-    await request<void>(
+export async function reportLocation(locationRequest: LocationReportRequest): Promise<ApiResult<void>> {
+    return await request<void>(
         apiClient.post("/locations/report", locationRequest),
         {
             fallbackError: "Falha ao reportar localização",
