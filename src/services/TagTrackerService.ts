@@ -10,7 +10,7 @@ import { fetchLocationText } from '../utils/locationUtils';
 const COMPANY_ID_LO = 0xFF;
 const COMPANY_ID_HI = 0xFF;
 const UPDATE_THROTTLE_MS = 500;   // ms entre updates da mesma tag
-const REPORT_THROTTLE_MS = 5000; // ms entre envios de relatório para a API
+const REPORT_THROTTLE_MS = 15000; // ms entre envios de relatório para a API
 
 // UUID do serviceData que identifica um pacote UFTag
 const TARGET_RESPONSE_UUID = "0000abff-0000-1000-8000-00805f9b34fb";

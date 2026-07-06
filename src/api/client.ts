@@ -11,7 +11,8 @@ const skipAuthEndpoints = [
 ];
 
 export const apiClient = axios.create({
-   baseURL: 'http://127.0.0.1:5156',
+   // baseURL: 'http://127.0.0.1:5156',
+   baseURL: 'https://uftag-api-production.up.railway.app',
    headers: {
       'Content-Type': 'application/json',
    }
